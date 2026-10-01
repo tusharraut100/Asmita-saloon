@@ -4,10 +4,8 @@ import {
   PlusCircle, 
   BarChart3, 
   Tag, 
-  Calendar, 
   Clock, 
   User, 
-  Phone, 
   ShoppingBag, 
   Download, 
   Printer, 
@@ -23,37 +21,46 @@ import {
   Send, 
   Percent, 
   Menu, 
-  X 
+  X,
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const INITIAL_SERVICES = [
-  { id: 's1', name: 'Signature Haircut', category: 'Hair', price: 250 },
-  { id: 's2', name: 'Beard Grooming & Shape', category: 'Beard', price: 150 },
-  { id: 's3', name: 'Hair Wash & Conditioning', category: 'Hair', price: 180 },
-  { id: 's4', name: 'Deep Cleanse Charcoal Facial', category: 'Facial', price: 650 },
-  { id: 's5', name: 'Head Massage with Herbal Oil', category: 'Therapy', price: 200 },
-  { id: 's6', name: 'Hair Color & Highlights', category: 'Color', price: 800 },
-  { id: 's7', name: 'Keratin Hair Spa Treatment', category: 'Therapy', price: 1200 }
+  { id: 's1', name: 'Signature Haircut', price: 250 },
+  { id: 's2', name: 'Beard Grooming & Shape', price: 150 },
+  { id: 's3', name: 'Hair Wash & Conditioning', price: 180 },
+  { id: 's4', name: 'Deep Cleanse Charcoal Facial', price: 650 },
+  { id: 's5', name: 'Head Massage with Herbal Oil', price: 200 },
+  { id: 's6', name: 'Hair Color & Highlights', price: 800 },
+  { id: 's7', name: 'Keratin Hair Spa Treatment', price: 1200 }
 ];
 
 const INITIAL_PRODUCTS = [
-  { id: 'p1', name: 'Matte Finish Hair Clay Wax', price: 350, category: 'Styling' },
-  { id: 'p2', name: 'Pure Argan Beard Growth Oil', price: 420, category: 'Beard Care' },
-  { id: 'p3', name: 'Tea Tree Anti-Dandruff Shampoo', price: 499, category: 'Hair Care' },
-  { id: 'p4', name: 'Beard Softener Conditioner', price: 380, category: 'Beard Care' }
+  { id: 'p1', name: 'Matte Finish Hair Clay Wax', price: 350 },
+  { id: 'p2', name: 'Pure Argan Beard Growth Oil', price: 420 },
+  { id: 'p3', name: 'Tea Tree Anti-Dandruff Shampoo', price: 499 },
+  { id: 'p4', name: 'Beard Softener Conditioner', price: 380 }
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'analytics' | 'catalog'
+  const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'reports' | 'services' | 'products'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [services, setServices] = useState(() => JSON.parse(localStorage.getItem('lux_services')) || INITIAL_SERVICES);
   const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lux_products')) || INITIAL_PRODUCTS);
   const [visits, setVisits] = useState(() => JSON.parse(localStorage.getItem('lux_visits')) || []);
 
-  // Today Date (max date for inputs)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Accurate Local Today Date (YYYY-MM-DD)
+  const getLocalTodayDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getLocalTodayDate();
 
   // Form State
   const [customerName, setCustomerName] = useState('');
@@ -80,11 +87,9 @@ export default function App() {
   // New catalog item forms
   const [newSrvName, setNewSrvName] = useState('');
   const [newSrvPrice, setNewSrvPrice] = useState('');
-  const [newSrvCat, setNewSrvCat] = useState('Hair');
 
   const [newPrdName, setNewPrdName] = useState('');
   const [newPrdPrice, setNewPrdPrice] = useState('');
-  const [newPrdCat, setNewPrdCat] = useState('Retail');
 
   // Fetch initial data from Supabase if configured
   useEffect(() => {
@@ -117,12 +122,21 @@ export default function App() {
 
         const { data: cloudServices } = await supabase.from('salon_services').select('*');
         if (cloudServices && cloudServices.length > 0) {
-          setServices(cloudServices);
+          // Merge to preserve existing services
+          setServices(prev => {
+            const map = new Map(prev.map(s => [s.id, s]));
+            cloudServices.forEach(s => map.set(s.id, { id: s.id, name: s.name, price: Number(s.price) }));
+            return Array.from(map.values());
+          });
         }
 
         const { data: cloudProducts } = await supabase.from('salon_products').select('*');
         if (cloudProducts && cloudProducts.length > 0) {
-          setProducts(cloudProducts);
+          setProducts(prev => {
+            const map = new Map(prev.map(p => [p.id, p]));
+            cloudProducts.forEach(p => map.set(p.id, { id: p.id, name: p.name, price: Number(p.price) }));
+            return Array.from(map.values());
+          });
         }
       } catch (err) {
         console.error('Supabase fetch error:', err);
@@ -186,6 +200,18 @@ export default function App() {
     setCustomerPhone(cleanDigits);
   };
 
+  // Date change handler strictly disallowing future date on all browsers / mobile pickers
+  const handleDateChange = (e) => {
+    const picked = e.target.value;
+    const currentToday = getLocalTodayDate();
+    if (picked && picked > currentToday) {
+      alert(`⚠️ Future date not allowed! You cannot select ${picked}. Resetting to today (${currentToday}).`);
+      setVisitDate(currentToday);
+      return;
+    }
+    setVisitDate(picked);
+  };
+
   // Save Customer Visit
   const handleSaveVisit = async (e) => {
     e.preventDefault();
@@ -199,8 +225,10 @@ export default function App() {
       return;
     }
 
-    if (visitDate > todayStr) {
-      alert('Future dates are not allowed! Please select today or a past date.');
+    const currentToday = getLocalTodayDate();
+    if (visitDate > currentToday) {
+      alert(`Future dates are not allowed! Selected date (${visitDate}) cannot be after today (${currentToday}).`);
+      setVisitDate(currentToday);
       return;
     }
 
@@ -251,6 +279,9 @@ export default function App() {
         if (error) console.error('Error uploading to Supabase:', error);
       });
     }
+
+    // Success Alert after adding customer
+    alert(`✅ Customer Visit Successfully Added!\n\nCustomer: ${newVisit.customerName}\nTotal Bill: ₹${newVisit.grandTotal}\nPayment: ${newVisit.paymentMethod}`);
 
     // Reset Form
     setCustomerName('');
@@ -307,10 +338,11 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         id: editSrvModal.id,
         name: editSrvModal.name,
         price: Number(editSrvModal.price),
-        category: editSrvModal.category
+        category: 'Salon'
       }]).then();
     }
     setEditSrvModal(null);
+    alert('✅ Service updated successfully!');
   };
 
   // Update Retail Product in Catalog
@@ -327,10 +359,76 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         id: editPrdModal.id,
         name: editPrdModal.name,
         price: Number(editPrdModal.price),
-        category: editPrdModal.category
+        category: 'Retail'
       }]).then();
     }
     setEditPrdModal(null);
+    alert('✅ Product updated successfully!');
+  };
+
+  // Add New Service Without Overwriting Existing Services
+  const handleAddNewService = () => {
+    if (!newSrvName.trim() || !newSrvPrice) {
+      alert('Please enter service name and price');
+      return;
+    }
+
+    const newServiceObj = {
+      id: 's_' + Date.now(),
+      name: newSrvName.trim(),
+      price: Number(newSrvPrice)
+    };
+
+    // Prepend to current services array so existing services are NOT removed
+    setServices(prev => [newServiceObj, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_services').insert([{
+        id: newServiceObj.id,
+        name: newServiceObj.name,
+        price: newServiceObj.price,
+        category: 'Salon'
+      }]).then(({ error }) => {
+        if (error) console.error('Error saving new service to Supabase:', error);
+      });
+    }
+
+    setNewSrvName('');
+    setNewSrvPrice('');
+    setNewSrvModal(false);
+    alert(`✅ New service "${newServiceObj.name}" added successfully!`);
+  };
+
+  // Add New Product Without Overwriting Existing Products
+  const handleAddNewProduct = () => {
+    if (!newPrdName.trim() || !newPrdPrice) {
+      alert('Please enter product name and price');
+      return;
+    }
+
+    const newProductObj = {
+      id: 'p_' + Date.now(),
+      name: newPrdName.trim(),
+      price: Number(newPrdPrice)
+    };
+
+    setProducts(prev => [newProductObj, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_products').insert([{
+        id: newProductObj.id,
+        name: newProductObj.name,
+        price: newProductObj.price,
+        category: 'Retail'
+      }]).then(({ error }) => {
+        if (error) console.error('Error saving new product to Supabase:', error);
+      });
+    }
+
+    setNewPrdName('');
+    setNewPrdPrice('');
+    setNewPrdModal(false);
+    alert(`✅ New product "${newProductObj.name}" added successfully!`);
   };
 
   // Filtering Visits
@@ -344,7 +442,8 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
     } else if (filterRange === 'yesterday') {
       const y = new Date();
       y.setDate(y.getDate() - 1);
-      dateMatch = vDate === y.toISOString().split('T')[0];
+      const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+      dateMatch = vDate === yStr;
     } else if (filterRange === 'week') {
       const w = new Date();
       w.setDate(w.getDate() - 7);
@@ -415,7 +514,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         </button>
       </div>
 
-      {/* Sidebar (Responsive for Desktop and Mobile Drawer) */}
+      {/* Sidebar Navigation */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="brand-section">
           <div className="brand-logo">
@@ -436,18 +535,25 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
             <span>New Daily Entry</span>
           </button>
           <button 
-            className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('analytics'); setMobileMenuOpen(false); }}
+            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }}
           >
-            <BarChart3 size={18} />
-            <span>Filter & Analytics</span>
+            <FileText size={18} />
+            <span>Report</span>
           </button>
           <button 
-            className={`nav-item ${activeTab === 'catalog' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('catalog'); setMobileMenuOpen(false); }}
+            className={`nav-item ${activeTab === 'services' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('services'); setMobileMenuOpen(false); }}
           >
-            <Tag size={18} />
-            <span>Services & Products</span>
+            <Scissors size={18} />
+            <span>Salon Services</span>
+          </button>
+          <button 
+            className={`nav-item ${activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('products'); setMobileMenuOpen(false); }}
+          >
+            <ShoppingBag size={18} />
+            <span>Retail Products</span>
           </button>
         </nav>
 
@@ -465,13 +571,15 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
           <div className="page-info">
             <h1>
               {activeTab === 'billing' && 'Daily Customer Billing & POS'}
-              {activeTab === 'analytics' && 'Customer History & Date Filters'}
-              {activeTab === 'catalog' && 'Salon Services & Product Catalog'}
+              {activeTab === 'reports' && 'Salon Sales & Customer Reports'}
+              {activeTab === 'services' && 'Manage Salon Services'}
+              {activeTab === 'products' && 'Manage Retail Products'}
             </h1>
             <p>
-              {activeTab === 'billing' && 'Select services done, retail products purchased, and create instant bills.'}
-              {activeTab === 'analytics' && 'Inspect your salon sales with daily, monthly, or custom range filters.'}
-              {activeTab === 'catalog' && 'Manage your salon services, update prices, and edit inventory.'}
+              {activeTab === 'billing' && 'Select services, add retail products, and create instant bills.'}
+              {activeTab === 'reports' && 'Filter and view your daily, monthly, or custom customer visits and revenue reports.'}
+              {activeTab === 'services' && 'Add new salon services or edit existing prices.'}
+              {activeTab === 'products' && 'Add new retail grooming products or update their pricing.'}
             </p>
           </div>
           <div className="header-tools">
@@ -532,13 +640,13 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                       type="date" 
                       max={todayStr}
                       value={visitDate}
-                      onChange={(e) => setVisitDate(e.target.value)}
+                      onChange={handleDateChange}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Services Selector Card */}
+              {/* Services Selector Card (Without Category) */}
               <div className="glass-panel" style={{ marginTop: '20px' }}>
                 <div className="panel-header">
                   <div className="panel-title">
@@ -556,10 +664,9 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                         onClick={() => toggleService(srv)}
                       >
                         {isSelected && <Check size={16} className="selected-check" />}
-                        <div className="srv-name">{srv.name}</div>
-                        <div className="srv-meta">
-                          <span className="srv-cat">{srv.category}</span>
-                          <span className="srv-price">₹{srv.price}</span>
+                        <div className="srv-name" style={{ fontSize: '0.95rem' }}>{srv.name}</div>
+                        <div className="srv-meta" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
+                          <span className="srv-price" style={{ fontSize: '1rem' }}>₹{srv.price}</span>
                         </div>
                       </div>
                     );
@@ -584,7 +691,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                       <div key={p.id} className="product-row">
                         <div className="p-details">
                           <div className="p-name">{p.name}</div>
-                          <div className="p-sub">₹{p.price} • {p.category}</div>
+                          <div className="p-sub">₹{p.price}</div>
                         </div>
                         <div className="qty-controls">
                           <button 
@@ -706,8 +813,8 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
           </div>
         )}
 
-        {/* TAB 2: ANALYTICS & FILTERING */}
-        {activeTab === 'analytics' && (
+        {/* TAB 2: REPORTS (Renamed from Filter & Analytics) */}
+        {activeTab === 'reports' && (
           <div>
             {/* Filter Bar */}
             <div className="glass-panel filter-bar-wrap">
@@ -725,7 +832,15 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   type="date" 
                   max={todayStr}
                   value={customStart} 
-                  onChange={(e) => { setCustomStart(e.target.value); setFilterRange('custom'); }} 
+                  onChange={(e) => {
+                    if (e.target.value > todayStr) {
+                      alert('Future start date not allowed');
+                      setCustomStart(todayStr);
+                    } else {
+                      setCustomStart(e.target.value);
+                      setFilterRange('custom');
+                    }
+                  }} 
                   style={{ padding: '6px 10px', fontSize: '0.8rem' }}
                 />
                 <span style={{ color: 'var(--text-muted)' }}>to</span>
@@ -733,7 +848,15 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   type="date" 
                   max={todayStr}
                   value={customEnd} 
-                  onChange={(e) => { setCustomEnd(e.target.value); setFilterRange('custom'); }} 
+                  onChange={(e) => {
+                    if (e.target.value > todayStr) {
+                      alert('Future end date not allowed');
+                      setCustomEnd(todayStr);
+                    } else {
+                      setCustomEnd(e.target.value);
+                      setFilterRange('custom');
+                    }
+                  }} 
                   style={{ padding: '6px 10px', fontSize: '0.8rem' }}
                 />
               </div>
@@ -887,93 +1010,90 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
           </div>
         )}
 
-        {/* TAB 3: SERVICES & PRODUCTS CATALOG */}
-        {activeTab === 'catalog' && (
-          <div className="catalog-grid-2">
-            {/* Services List with Update Button */}
-            <div className="glass-panel">
-              <div className="panel-header">
-                <div className="panel-title">
-                  <Scissors size={18} /> Salon Services
-                </div>
-                <button className="btn btn-sm btn-gold" onClick={() => setNewSrvModal(true)}>
-                  <Plus size={14} /> Add Service
-                </button>
+        {/* TAB 3: SEPARATE SALON SERVICES TAB */}
+        {activeTab === 'services' && (
+          <div className="glass-panel">
+            <div className="panel-header">
+              <div className="panel-title">
+                <Scissors size={20} /> Salon Services ({services.length})
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {services.map(s => (
-                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(10,12,16,0.5)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div>
-                      <strong>{s.name}</strong>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Category: {s.category}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--gold)', marginRight: '6px' }}>₹{s.price}</span>
-                      <button 
-                        className="btn-counter" 
-                        title="Edit / Update Service"
-                        onClick={() => setEditSrvModal({ ...s })}
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button 
-                        className="btn-counter" 
-                        title="Delete Service"
-                        onClick={() => {
-                          if (confirm(`Delete service "${s.name}"?`)) {
-                            setServices(services.filter(item => item.id !== s.id));
-                          }
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button className="btn btn-sm btn-gold" onClick={() => setNewSrvModal(true)}>
+                <Plus size={14} /> Add Service
+              </button>
             </div>
-
-            {/* Products List */}
-            <div className="glass-panel">
-              <div className="panel-header">
-                <div className="panel-title">
-                  <ShoppingBag size={18} /> Retail Products
-                </div>
-                <button className="btn btn-sm btn-gold" onClick={() => setNewPrdModal(true)}>
-                  <Plus size={14} /> Add Product
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {products.map(p => (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(10,12,16,0.5)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div>
-                      <strong>{p.name}</strong>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{p.category}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--emerald)', marginRight: '6px' }}>₹{p.price}</span>
-                      <button 
-                        className="btn-counter" 
-                        title="Edit / Update Product"
-                        onClick={() => setEditPrdModal({ ...p })}
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button 
-                        className="btn-counter" 
-                        title="Delete Product"
-                        onClick={() => {
-                          if (confirm(`Delete product "${p.name}"?`)) {
-                            setProducts(products.filter(item => item.id !== p.id));
-                          }
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {services.map(s => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(10,12,16,0.5)', padding: '14px 18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                  <div>
+                    <strong style={{ fontSize: '1rem' }}>{s.name}</strong>
                   </div>
-                ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--gold)', marginRight: '6px', fontSize: '1.05rem' }}>₹{s.price}</span>
+                    <button 
+                      className="btn-counter" 
+                      title="Edit / Update Service"
+                      onClick={() => setEditSrvModal({ ...s })}
+                    >
+                      <Edit3 size={15} />
+                    </button>
+                    <button 
+                      className="btn-counter" 
+                      title="Delete Service"
+                      onClick={() => {
+                        if (confirm(`Delete service "${s.name}"?`)) {
+                          setServices(services.filter(item => item.id !== s.id));
+                        }
+                      }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: SEPARATE RETAIL PRODUCTS TAB */}
+        {activeTab === 'products' && (
+          <div className="glass-panel">
+            <div className="panel-header">
+              <div className="panel-title">
+                <ShoppingBag size={20} /> Retail Products ({products.length})
               </div>
+              <button className="btn btn-sm btn-gold" onClick={() => setNewPrdModal(true)}>
+                <Plus size={14} /> Add Product
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {products.map(p => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(10,12,16,0.5)', padding: '14px 18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                  <div>
+                    <strong style={{ fontSize: '1rem' }}>{p.name}</strong>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--emerald)', marginRight: '6px', fontSize: '1.05rem' }}>₹{p.price}</span>
+                    <button 
+                      className="btn-counter" 
+                      title="Edit / Update Product"
+                      onClick={() => setEditPrdModal({ ...p })}
+                    >
+                      <Edit3 size={15} />
+                    </button>
+                    <button 
+                      className="btn-counter" 
+                      title="Delete Product"
+                      onClick={() => {
+                        if (confirm(`Delete product "${p.name}"?`)) {
+                          setProducts(products.filter(item => item.id !== p.id));
+                        }
+                      }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1053,7 +1173,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         </div>
       )}
 
-      {/* UPDATE / EDIT SERVICE MODAL */}
+      {/* UPDATE / EDIT SERVICE MODAL (No Category) */}
       {editSrvModal && (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -1077,19 +1197,6 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   value={editSrvModal.price} 
                   onChange={(e) => setEditSrvModal({ ...editSrvModal, price: Number(e.target.value) })} 
                 />
-              </div>
-              <div className="input-field">
-                <label>Category</label>
-                <select 
-                  value={editSrvModal.category} 
-                  onChange={(e) => setEditSrvModal({ ...editSrvModal, category: e.target.value })}
-                >
-                  <option value="Hair">Hair</option>
-                  <option value="Beard">Beard</option>
-                  <option value="Facial">Facial</option>
-                  <option value="Therapy">Therapy</option>
-                  <option value="Color">Color</option>
-                </select>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -1125,14 +1232,6 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   onChange={(e) => setEditPrdModal({ ...editPrdModal, price: Number(e.target.value) })} 
                 />
               </div>
-              <div className="input-field">
-                <label>Category</label>
-                <input 
-                  type="text" 
-                  value={editPrdModal.category} 
-                  onChange={(e) => setEditPrdModal({ ...editPrdModal, category: e.target.value })} 
-                />
-              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-ghost" onClick={() => setEditPrdModal(null)}>Cancel</button>
@@ -1142,7 +1241,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         </div>
       )}
 
-      {/* ADD SERVICE MODAL */}
+      {/* ADD SERVICE MODAL (No Category) */}
       {newSrvModal && (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -1159,25 +1258,9 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                 <label>Price (₹)</label>
                 <input type="number" placeholder="500" value={newSrvPrice} onChange={(e) => setNewSrvPrice(e.target.value)} />
               </div>
-              <div className="input-field">
-                <label>Category</label>
-                <select value={newSrvCat} onChange={(e) => setNewSrvCat(e.target.value)}>
-                  <option value="Hair">Hair</option>
-                  <option value="Beard">Beard</option>
-                  <option value="Facial">Facial</option>
-                  <option value="Therapy">Therapy</option>
-                  <option value="Color">Color</option>
-                </select>
-              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn btn-gold" onClick={() => {
-                if (!newSrvName || !newSrvPrice) return alert('Enter name and price');
-                setServices([...services, { id: 's_' + Date.now(), name: newSrvName, price: Number(newSrvPrice), category: newSrvCat }]);
-                setNewSrvName('');
-                setNewSrvPrice('');
-                setNewSrvModal(false);
-              }}>Save Service</button>
+              <button className="btn btn-gold" onClick={handleAddNewService}>Save Service</button>
             </div>
           </div>
         </div>
@@ -1200,19 +1283,9 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                 <label>Price (₹)</label>
                 <input type="number" placeholder="350" value={newPrdPrice} onChange={(e) => setNewPrdPrice(e.target.value)} />
               </div>
-              <div className="input-field">
-                <label>Category</label>
-                <input type="text" placeholder="Styling / Care" value={newPrdCat} onChange={(e) => setNewPrdCat(e.target.value)} />
-              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn btn-gold" onClick={() => {
-                if (!newPrdName || !newPrdPrice) return alert('Enter name and price');
-                setProducts([...products, { id: 'p_' + Date.now(), name: newPrdName, price: Number(newPrdPrice), category: newPrdCat }]);
-                setNewPrdName('');
-                setNewPrdPrice('');
-                setNewPrdModal(false);
-              }}>Save Product</button>
+              <button className="btn btn-gold" onClick={handleAddNewProduct}>Save Product</button>
             </div>
           </div>
         </div>
