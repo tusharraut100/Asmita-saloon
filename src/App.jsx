@@ -747,18 +747,30 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   ) : (
                     <>
                       {selectedServices.map(s => (
-                        <div key={s.id} className="cart-row">
-                          <div><span className="type-tag">Service</span>{s.name}</div>
-                          <strong>₹{s.price}</strong>
+                        <div key={s.id} className="cart-item-card">
+                          <div className="cart-item-left">
+                            <span className="type-tag" style={{ background: 'rgba(212, 175, 55, 0.2)', color: 'var(--gold)' }}>Service</span>
+                            <span className="cart-item-name">{s.name}</span>
+                          </div>
+                          <div className="cart-item-right">
+                            <span className="cart-qty-badge">Qty: 1</span>
+                            <strong className="cart-price">₹{s.price}</strong>
+                          </div>
                         </div>
                       ))}
                       {Object.entries(selectedProducts).map(([pid, qty]) => {
                         const prod = products.find(p => p.id === pid);
                         if (!prod) return null;
                         return (
-                          <div key={pid} className="cart-row">
-                            <div><span className="type-tag">Retail</span>{prod.name} × {qty}</div>
-                            <strong>₹{prod.price * qty}</strong>
+                          <div key={pid} className="cart-item-card">
+                            <div className="cart-item-left">
+                              <span className="type-tag" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>Retail</span>
+                              <span className="cart-item-name">{prod.name}</span>
+                            </div>
+                            <div className="cart-item-right">
+                              <span className="cart-qty-badge" style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}>Qty: {qty}</span>
+                              <strong className="cart-price">₹{prod.price * qty}</strong>
+                            </div>
                           </div>
                         );
                       })}
@@ -766,7 +778,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   )}
                 </div>
 
-                <div className="divider"></div>
+                <div className="divider" style={{ margin: '16px 0', borderTop: '1px solid rgba(255, 255, 255, 0.15)' }}></div>
 
                 <div className="summary-rows">
                   <div className="sum-row">
