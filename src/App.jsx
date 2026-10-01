@@ -16,12 +16,14 @@ import {
   Minus, 
   Trash2, 
   Search, 
-  Sparkles,
-  CreditCard,
-  Banknote,
-  QrCode,
-  Cloud,
-  CloudOff
+  CreditCard, 
+  Banknote, 
+  QrCode, 
+  Edit3, 
+  Send, 
+  Percent, 
+  Menu, 
+  X 
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -45,15 +47,18 @@ const INITIAL_PRODUCTS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'analytics' | 'catalog'
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [services, setServices] = useState(() => JSON.parse(localStorage.getItem('lux_services')) || INITIAL_SERVICES);
   const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lux_products')) || INITIAL_PRODUCTS);
   const [visits, setVisits] = useState(() => JSON.parse(localStorage.getItem('lux_visits')) || []);
-  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  // Today Date (max date for inputs)
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [visitDate, setVisitDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [visitDate, setVisitDate] = useState(todayStr);
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [discount, setDiscount] = useState(0);
@@ -69,6 +74,7 @@ export default function App() {
   const [activeReceipt, setActiveReceipt] = useState(null);
   const [newSrvModal, setNewSrvModal] = useState(false);
   const [newPrdModal, setNewPrdModal] = useState(false);
+  const [editSrvModal, setEditSrvModal] = useState(null); // service object when editing
 
   // New catalog item forms
   const [newSrvName, setNewSrvName] = useState('');
@@ -84,7 +90,6 @@ export default function App() {
     if (!isSupabaseConfigured || !supabase) return;
 
     const fetchCloudData = async () => {
-      setIsCloudSyncing(true);
       try {
         const { data: cloudVisits, error: vErr } = await supabase
           .from('salon_visits')
@@ -120,8 +125,6 @@ export default function App() {
         }
       } catch (err) {
         console.error('Supabase fetch error:', err);
-      } finally {
-        setIsCloudSyncing(false);
       }
     };
 
@@ -150,7 +153,6 @@ export default function App() {
   const grandTotal = Math.max(0, (servicesTotal + productsTotal) - (Number(discount) || 0));
 
   // Today Total in sidebar
-  const todayStr = new Date().toISOString().split('T')[0];
   const todayRevenue = visits
     .filter(v => v.date === todayStr)
     .reduce((sum, v) => sum + v.grandTotal, 0);
@@ -177,6 +179,12 @@ export default function App() {
     }
   };
 
+  // Phone input handler (strict 10 digits only)
+  const handlePhoneChange = (e) => {
+    const cleanDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setCustomerPhone(cleanDigits);
+  };
+
   // Save Customer Visit
   const handleSaveVisit = async (e) => {
     e.preventDefault();
@@ -184,6 +192,17 @@ export default function App() {
       alert('Please enter customer name');
       return;
     }
+
+    if (customerPhone && customerPhone.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    if (visitDate > todayStr) {
+      alert('Future dates are not allowed! Please select today or a past date.');
+      return;
+    }
+
     if (selectedServices.length === 0 && Object.keys(selectedProducts).length === 0) {
       alert('Please select at least 1 service or 1 product');
       return;
@@ -241,6 +260,58 @@ export default function App() {
     setActiveReceipt(newVisit);
   };
 
+  // WhatsApp Invoice Send Helper
+  const handleSendWhatsApp = (visit) => {
+    if (!visit.customerPhone || visit.customerPhone === 'Walk-in' || visit.customerPhone.length !== 10) {
+      alert('Customer does not have a valid 10-digit mobile number to send WhatsApp invoice.');
+      return;
+    }
+
+    const srvLines = visit.services.map(s => `• ${s.name}: ₹${s.price}`).join('\n');
+    const prdLines = visit.products.map(p => `• ${p.name} (x${p.qty}): ₹${p.lineTotal}`).join('\n');
+    const itemsText = [srvLines, prdLines].filter(Boolean).join('\n');
+
+    const message = 
+`✨ *LUXECUT SALON INVOICE* ✨
+━━━━━━━━━━━━━━━━━━━━
+👤 *Customer:* ${visit.customerName}
+📱 *Phone:* ${visit.customerPhone}
+📅 *Date:* ${visit.date} ${visit.time}
+🧾 *Invoice #:* ${visit.id}
+
+💇 *Services & Products:*
+${itemsText}
+━━━━━━━━━━━━━━━━━━━━
+💵 *Subtotal:* ₹${visit.servicesTotal + visit.productsTotal}
+${visit.discount > 0 ? `🎁 *Discount Applied:* -₹${visit.discount}\n` : ''}💰 *Total Paid:* ₹${visit.grandTotal} (${visit.paymentMethod})
+━━━━━━━━━━━━━━━━━━━━
+Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/91${visit.customerPhone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // Update Service in Catalog
+  const handleUpdateService = () => {
+    if (!editSrvModal.name.trim() || !editSrvModal.price) {
+      alert('Please provide valid name and price');
+      return;
+    }
+    const updated = services.map(s => s.id === editSrvModal.id ? editSrvModal : s);
+    setServices(updated);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_services').upsert([{
+        id: editSrvModal.id,
+        name: editSrvModal.name,
+        price: Number(editSrvModal.price),
+        category: editSrvModal.category
+      }]).then();
+    }
+    setEditSrvModal(null);
+  };
+
   // Filtering Visits
   const filteredVisits = visits.filter(v => {
     const now = new Date();
@@ -279,17 +350,18 @@ export default function App() {
   const metricRevenue = filteredVisits.reduce((acc, v) => acc + v.grandTotal, 0);
   const metricServicesRev = filteredVisits.reduce((acc, v) => acc + v.servicesTotal, 0);
   const metricProductsRev = filteredVisits.reduce((acc, v) => acc + v.productsTotal, 0);
+  const metricDiscountTotal = filteredVisits.reduce((acc, v) => acc + (v.discount || 0), 0);
   const metricServicesCount = filteredVisits.reduce((acc, v) => acc + (v.services?.length || 0), 0);
   const metricProductsCount = filteredVisits.reduce((acc, v) => acc + (v.products?.reduce((s, p) => s + p.qty, 0) || 0), 0);
 
   // CSV Export
   const handleExportCSV = () => {
     if (filteredVisits.length === 0) return alert('No records to export');
-    let csv = "Invoice,Date,Time,Customer,Phone,Services,Products,Payment,Total\n";
+    let csv = "Invoice,Date,Time,Customer,Phone,Services,Products,Payment,Discount,Total\n";
     filteredVisits.forEach(v => {
       const srvs = v.services.map(s => s.name).join(' | ');
       const prds = v.products.map(p => `${p.name} (x${p.qty})`).join(' | ');
-      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${srvs}","${prds}","${v.paymentMethod}","${v.grandTotal}"\n`;
+      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${srvs}","${prds}","${v.paymentMethod}","${v.discount}","${v.grandTotal}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -303,8 +375,27 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
+      {/* Mobile Top Navigation Header */}
+      <div className="mobile-header">
+        <div className="brand-section" style={{ padding: 0, margin: 0, border: 'none' }}>
+          <div className="brand-logo" style={{ width: '36px', height: '36px' }}>
+            <Scissors size={18} />
+          </div>
+          <div className="brand-title">
+            <h2 style={{ fontSize: '1.1rem' }}>LUXECUT</h2>
+          </div>
+        </div>
+        <button 
+          className="btn-counter" 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle Navigation"
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Sidebar (Responsive for Desktop and Mobile Drawer) */}
+      <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="brand-section">
           <div className="brand-logo">
             <Scissors size={22} />
@@ -318,21 +409,21 @@ export default function App() {
         <nav className="nav-links">
           <button 
             className={`nav-item ${activeTab === 'billing' ? 'active' : ''}`}
-            onClick={() => setActiveTab('billing')}
+            onClick={() => { setActiveTab('billing'); setMobileMenuOpen(false); }}
           >
             <PlusCircle size={18} />
             <span>New Daily Entry</span>
           </button>
           <button 
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => { setActiveTab('analytics'); setMobileMenuOpen(false); }}
           >
             <BarChart3 size={18} />
             <span>Filter & Analytics</span>
           </button>
           <button 
             className={`nav-item ${activeTab === 'catalog' ? 'active' : ''}`}
-            onClick={() => setActiveTab('catalog')}
+            onClick={() => { setActiveTab('catalog'); setMobileMenuOpen(false); }}
           >
             <Tag size={18} />
             <span>Services & Products</span>
@@ -347,7 +438,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Section */}
+      {/* Main Content Area */}
       <main className="main-wrapper">
         <header className="header-bar">
           <div className="page-info">
@@ -359,33 +450,13 @@ export default function App() {
             <p>
               {activeTab === 'billing' && 'Select services done, retail products purchased, and create instant bills.'}
               {activeTab === 'analytics' && 'Inspect your salon sales with daily, monthly, or custom range filters.'}
-              {activeTab === 'catalog' && 'Manage your salon services and retail inventory pricing.'}
+              {activeTab === 'catalog' && 'Manage your salon services, update prices, and edit inventory.'}
             </p>
           </div>
           <div className="header-tools">
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-            </div>
-            <div 
-              className="badge-date" 
-              style={{
-                borderColor: isSupabaseConfigured ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.3)',
-                color: isSupabaseConfigured ? '#34d399' : '#f87171'
-              }}
-              title={isSupabaseConfigured ? "Connected to Supabase Cloud" : "Local Storage Mode (.env needed for cloud)"}
-            >
-              {isSupabaseConfigured ? (
-                <>
-                  <Cloud size={16} />
-                  <span>{isCloudSyncing ? 'Syncing...' : 'Cloud Synced'}</span>
-                </>
-              ) : (
-                <>
-                  <CloudOff size={16} />
-                  <span>Local Mode</span>
-                </>
-              )}
             </div>
           </div>
         </header>
@@ -410,18 +481,35 @@ export default function App() {
                     />
                   </div>
                   <div className="input-field">
-                    <label>Mobile Number</label>
-                    <input 
-                      type="tel" 
-                      placeholder="e.g. 9876543210" 
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                    />
+                    <label>Mobile Number (10 Digits)</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="tel" 
+                        placeholder="9876543210" 
+                        maxLength={10}
+                        value={customerPhone}
+                        onChange={handlePhoneChange}
+                        style={{ width: '100%' }}
+                      />
+                      {customerPhone && (
+                        <span style={{ 
+                          position: 'absolute', 
+                          right: '10px', 
+                          top: '50%', 
+                          transform: 'translateY(-50%)', 
+                          fontSize: '0.72rem', 
+                          color: customerPhone.length === 10 ? '#34d399' : '#f87171' 
+                        }}>
+                          {customerPhone.length}/10
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="input-field">
-                    <label>Visit Date</label>
+                    <label>Visit Date (Max: Today)</label>
                     <input 
                       type="date" 
+                      max={todayStr}
                       value={visitDate}
                       onChange={(e) => setVisitDate(e.target.value)}
                     />
@@ -544,7 +632,7 @@ export default function App() {
                     <span>Products Total:</span>
                     <span>₹{productsTotal}</span>
                   </div>
-                  <div className="sum-row">
+                  <div className="sum-row" style={{ color: Number(discount) > 0 ? '#f87171' : 'inherit' }}>
                     <span>Discount (₹):</span>
                     <input 
                       type="number" 
@@ -610,10 +698,11 @@ export default function App() {
                 <button className={`pill-btn ${filterRange === 'all' ? 'active' : ''}`} onClick={() => setFilterRange('all')}>All Time</button>
               </div>
 
-              {/* Custom Date Range */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Custom Date Range (Max Date = Today) */}
+              <div className="custom-date-container">
                 <input 
                   type="date" 
+                  max={todayStr}
                   value={customStart} 
                   onChange={(e) => { setCustomStart(e.target.value); setFilterRange('custom'); }} 
                   style={{ padding: '6px 10px', fontSize: '0.8rem' }}
@@ -621,6 +710,7 @@ export default function App() {
                 <span style={{ color: 'var(--text-muted)' }}>to</span>
                 <input 
                   type="date" 
+                  max={todayStr}
                   value={customEnd} 
                   onChange={(e) => { setCustomEnd(e.target.value); setFilterRange('custom'); }} 
                   style={{ padding: '6px 10px', fontSize: '0.8rem' }}
@@ -659,11 +749,11 @@ export default function App() {
               </div>
 
               <div className="kpi-box">
-                <div className="kpi-ico purple"><Scissors size={22} /></div>
+                <div className="kpi-ico purple"><Percent size={22} /></div>
                 <div className="kpi-text">
-                  <span>Services Sales</span>
-                  <h3>₹{metricServicesRev.toLocaleString('en-IN')}</h3>
-                  <small>{metricServicesCount} services done</small>
+                  <span>Discounts Given</span>
+                  <h3>₹{metricDiscountTotal.toLocaleString('en-IN')}</h3>
+                  <small>Total savings provided</small>
                 </div>
               </div>
 
@@ -679,8 +769,8 @@ export default function App() {
 
             {/* Customer Records Table */}
             <div className="glass-panel">
-              <div className="panel-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(10,12,16,0.6)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', width: '320px' }}>
+              <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(10,12,16,0.6)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', minWidth: '240px' }}>
                   <Search size={16} color="var(--text-dim)" />
                   <input 
                     type="text" 
@@ -703,9 +793,9 @@ export default function App() {
                       <th>Customer Details</th>
                       <th>Services</th>
                       <th>Products</th>
-                      <th>Payment</th>
+                      <th>Discount</th>
                       <th>Total</th>
-                      <th>Receipt</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -737,19 +827,34 @@ export default function App() {
                             )) : <span style={{ color: 'var(--text-dim)' }}>None</span>}
                           </td>
                           <td>
-                            <span className={`badge-pay ${v.paymentMethod}`}>{v.paymentMethod}</span>
+                            {v.discount > 0 ? (
+                              <span style={{ color: '#f87171', fontWeight: 600 }}>-₹{v.discount}</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-dim)' }}>₹0</span>
+                            )}
                           </td>
                           <td>
                             <strong style={{ color: 'var(--gold)' }}>₹{v.grandTotal}</strong>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{v.paymentMethod}</div>
                           </td>
                           <td>
-                            <button 
-                              className="btn btn-sm btn-ghost" 
-                              onClick={() => setActiveReceipt(v)}
-                              title="View Invoice"
-                            >
-                              View
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button 
+                                className="btn btn-sm btn-ghost" 
+                                onClick={() => setActiveReceipt(v)}
+                                title="View Receipt"
+                              >
+                                View
+                              </button>
+                              <button 
+                                className="btn btn-sm" 
+                                style={{ background: '#25D366', color: '#fff', padding: '6px 8px' }}
+                                onClick={() => handleSendWhatsApp(v)}
+                                title="Send WhatsApp Receipt"
+                              >
+                                <Send size={13} /> WhatsApp
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -763,8 +868,8 @@ export default function App() {
 
         {/* TAB 3: SERVICES & PRODUCTS CATALOG */}
         {activeTab === 'catalog' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            {/* Services List */}
+          <div className="catalog-grid-2">
+            {/* Services List with Update Button */}
             <div className="glass-panel">
               <div className="panel-header">
                 <div className="panel-title">
@@ -781,11 +886,23 @@ export default function App() {
                       <strong>{s.name}</strong>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Category: {s.category}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--gold)' }}>₹{s.price}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--gold)', marginRight: '6px' }}>₹{s.price}</span>
                       <button 
                         className="btn-counter" 
-                        onClick={() => setServices(services.filter(item => item.id !== s.id))}
+                        title="Edit / Update Service"
+                        onClick={() => setEditSrvModal({ ...s })}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button 
+                        className="btn-counter" 
+                        title="Delete Service"
+                        onClick={() => {
+                          if (confirm(`Delete service "${s.name}"?`)) {
+                            setServices(services.filter(item => item.id !== s.id));
+                          }
+                        }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -812,11 +929,15 @@ export default function App() {
                       <strong>{p.name}</strong>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{p.category}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--emerald)' }}>₹{p.price}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--emerald)', marginRight: '6px' }}>₹{p.price}</span>
                       <button 
                         className="btn-counter" 
-                        onClick={() => setProducts(products.filter(item => item.id !== p.id))}
+                        onClick={() => {
+                          if (confirm(`Delete product "${p.name}"?`)) {
+                            setProducts(products.filter(item => item.id !== p.id));
+                          }
+                        }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -829,7 +950,7 @@ export default function App() {
         )}
       </main>
 
-      {/* RECEIPT MODAL */}
+      {/* RECEIPT MODAL WITH WHATSAPP ACTION & DISCOUNT DISPLAY */}
       {activeReceipt && (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -864,19 +985,87 @@ export default function App() {
                 ))}
               </div>
               <div className="divider" style={{ background: '#ddd' }}></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem' }}>
-                <span>Total Amount:</span>
-                <span>₹{activeReceipt.grandTotal}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal:</span>
+                  <span>₹{activeReceipt.servicesTotal + activeReceipt.productsTotal}</span>
+                </div>
+                {activeReceipt.discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b91c1c', fontWeight: 600 }}>
+                    <span>Discount Applied:</span>
+                    <span>-₹{activeReceipt.discount}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #ccc' }}>
+                  <span>Total Paid:</span>
+                  <span>₹{activeReceipt.grandTotal}</span>
+                </div>
               </div>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button 
+                className="btn btn-sm" 
+                style={{ background: '#25D366', color: '#fff', flex: '1' }}
+                onClick={() => handleSendWhatsApp(activeReceipt)}
+              >
+                <Send size={15} /> WhatsApp Receipt
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-sm btn-ghost" onClick={() => window.print()}>
+                  <Printer size={15} /> Print
+                </button>
+                <button className="btn btn-sm btn-gold" onClick={() => setActiveReceipt(null)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UPDATE / EDIT SERVICE MODAL */}
+      {editSrvModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="panel-header">
+              <h3>Update Service</h3>
+              <button className="btn-counter" onClick={() => setEditSrvModal(null)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '16px 0' }}>
+              <div className="input-field">
+                <label>Service Name</label>
+                <input 
+                  type="text" 
+                  value={editSrvModal.name} 
+                  onChange={(e) => setEditSrvModal({ ...editSrvModal, name: e.target.value })} 
+                />
+              </div>
+              <div className="input-field">
+                <label>Price (₹)</label>
+                <input 
+                  type="number" 
+                  value={editSrvModal.price} 
+                  onChange={(e) => setEditSrvModal({ ...editSrvModal, price: Number(e.target.value) })} 
+                />
+              </div>
+              <div className="input-field">
+                <label>Category</label>
+                <select 
+                  value={editSrvModal.category} 
+                  onChange={(e) => setEditSrvModal({ ...editSrvModal, category: e.target.value })}
+                >
+                  <option value="Hair">Hair</option>
+                  <option value="Beard">Beard</option>
+                  <option value="Facial">Facial</option>
+                  <option value="Therapy">Therapy</option>
+                  <option value="Color">Color</option>
+                </select>
+              </div>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn btn-ghost" onClick={() => window.print()}>
-                <Printer size={15} /> Print
-              </button>
-              <button className="btn btn-gold" onClick={() => setActiveReceipt(null)}>
-                Done
-              </button>
+              <button className="btn btn-ghost" onClick={() => setEditSrvModal(null)}>Cancel</button>
+              <button className="btn btn-gold" onClick={handleUpdateService}>Update Service</button>
             </div>
           </div>
         </div>
@@ -906,6 +1095,7 @@ export default function App() {
                   <option value="Beard">Beard</option>
                   <option value="Facial">Facial</option>
                   <option value="Therapy">Therapy</option>
+                  <option value="Color">Color</option>
                 </select>
               </div>
             </div>
