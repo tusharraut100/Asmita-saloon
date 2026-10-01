@@ -228,61 +228,6 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // Seed sample records
-  const handleSeedDemo = () => {
-    const yDate = new Date();
-    yDate.setDate(yDate.getDate() - 1);
-    const yStr = yDate.toISOString().split('T')[0];
-
-    const demo = [
-      {
-        id: 'INV-1092',
-        customerName: 'Rohit Sharma',
-        customerPhone: '9812345670',
-        date: todayStr,
-        time: '10:30 AM',
-        services: [{ id: 's1', name: 'Signature Haircut', price: 250 }],
-        products: [{ id: 'p1', name: 'Matte Finish Hair Clay Wax', price: 350, qty: 1, lineTotal: 350 }],
-        servicesTotal: 250,
-        productsTotal: 350,
-        discount: 50,
-        grandTotal: 550,
-        paymentMethod: 'UPI'
-      },
-      {
-        id: 'INV-1093',
-        customerName: 'Karan Mehra',
-        customerPhone: '9928374650',
-        date: todayStr,
-        time: '11:45 AM',
-        services: [{ id: 's4', name: 'Deep Cleanse Charcoal Facial', price: 650 }, { id: 's2', name: 'Beard Grooming & Shape', price: 150 }],
-        products: [],
-        servicesTotal: 800,
-        productsTotal: 0,
-        discount: 0,
-        grandTotal: 800,
-        paymentMethod: 'Cash'
-      },
-      {
-        id: 'INV-1088',
-        customerName: 'Anil Kapoor',
-        customerPhone: '9845012345',
-        date: yStr,
-        time: '04:15 PM',
-        services: [{ id: 's7', name: 'Keratin Hair Spa Treatment', price: 1200 }],
-        products: [{ id: 'p2', name: 'Pure Argan Beard Growth Oil', price: 420, qty: 1, lineTotal: 420 }],
-        servicesTotal: 1200,
-        productsTotal: 420,
-        discount: 100,
-        grandTotal: 1520,
-        paymentMethod: 'Card'
-      }
-    ];
-
-    setVisits([...demo, ...visits]);
-    alert('Demo data loaded successfully!');
-  };
-
   return (
     <div className="app-container">
       {/* Sidebar */}
@@ -349,9 +294,6 @@ export default function App() {
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <button className="btn btn-outline-gold btn-sm" onClick={handleSeedDemo}>
-              <Sparkles size={14} /> Load Demo
-            </button>
           </div>
         </header>
 
