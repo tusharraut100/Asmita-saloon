@@ -793,8 +793,8 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                   </div>
                 </div>
 
-                {/* Payment Option */}
-                <div className="pay-options">
+                {/* Payment Option (Cash & UPI) */}
+                <div className="pay-options" style={{ gridTemplateColumns: '1fr 1fr' }}>
                   <button 
                     type="button" 
                     className={`pay-btn ${paymentMethod === 'Cash' ? 'selected' : ''}`}
@@ -807,14 +807,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                     className={`pay-btn ${paymentMethod === 'UPI' ? 'selected' : ''}`}
                     onClick={() => setPaymentMethod('UPI')}
                   >
-                    <QrCode size={16} /> UPI
-                  </button>
-                  <button 
-                    type="button" 
-                    className={`pay-btn ${paymentMethod === 'Card' ? 'selected' : ''}`}
-                    onClick={() => setPaymentMethod('Card')}
-                  >
-                    <CreditCard size={16} /> Card
+                    <QrCode size={16} /> UPI / Online
                   </button>
                 </div>
 
