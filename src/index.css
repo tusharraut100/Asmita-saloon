@@ -287,7 +287,7 @@ body {
 /* Service Selection Grid */
 .service-selector-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
 }
 
@@ -878,7 +878,7 @@ body {
   }
 
   .service-selector-grid {
-    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 10px;
   }
 
@@ -905,6 +905,25 @@ body {
 
 /* Extra Small Phones */
 @media (max-width: 480px) {
+  .service-selector-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+
+  .service-card {
+    padding: 10px 12px;
+    min-height: 80px;
+  }
+
+  .service-card .srv-name {
+    font-size: 0.88rem;
+  }
+
+  .srv-price-pill {
+    font-size: 0.86rem;
+    padding: 2px 8px;
+  }
+
   .kpi-row {
     grid-template-columns: 1fr;
   }
