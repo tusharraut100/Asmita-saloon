@@ -30,11 +30,19 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 const INITIAL_SERVICES = [
   { id: 's1', name: 'Signature Haircut', price: 250 },
   { id: 's2', name: 'Beard Grooming & Shape', price: 150 },
-  { id: 's3', name: 'Hair Wash & Conditioning', price: 180 },
-  { id: 's4', name: 'Deep Cleanse Charcoal Facial', price: 650 },
+  { id: 's3', name: 'Hair Wash & Blow Dry', price: 180 },
+  { id: 's4', name: 'Beard Trim & Razor Line', price: 100 },
   { id: 's5', name: 'Head Massage with Herbal Oil', price: 200 },
-  { id: 's6', name: 'Hair Color & Highlights', price: 800 },
-  { id: 's7', name: 'Keratin Hair Spa Treatment', price: 1200 }
+  { id: 's6', name: 'Charcoal Deep Cleanse Facial', price: 650 },
+  { id: 's7', name: 'O3+ Bridal / Groom Glow Facial', price: 1500 },
+  { id: 's8', name: 'D-Tan Pack (Face & Neck)', price: 350 },
+  { id: 's9', name: 'Keratin Hair Spa Treatment', price: 1200 },
+  { id: 's10', name: 'Anti-Dandruff Scalp Treatment', price: 850 },
+  { id: 's11', name: 'Global Hair Color', price: 800 },
+  { id: 's12', name: 'Beard Color & Touch-up', price: 300 },
+  { id: 's13', name: 'Hair Highlights / Streaks', price: 1100 },
+  { id: 's14', name: 'Face Scrub & Steam Pack', price: 400 },
+  { id: 's15', name: 'Waxing / Threading (Eyebrows)', price: 80 }
 ];
 
 const INITIAL_PRODUCTS = [
@@ -47,7 +55,16 @@ const INITIAL_PRODUCTS = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'reports' | 'services' | 'products'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [services, setServices] = useState(() => JSON.parse(localStorage.getItem('lux_services')) || INITIAL_SERVICES);
+  const [services, setServices] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem('lux_services'));
+    if (!saved || saved.length === 0) return INITIAL_SERVICES;
+    const map = new Map();
+    // Include all new initial services first
+    INITIAL_SERVICES.forEach(s => map.set(s.name.toLowerCase().trim(), s));
+    // Keep any custom user-added services
+    saved.forEach(s => map.set(s.name.toLowerCase().trim(), s));
+    return Array.from(map.values());
+  });
   const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lux_products')) || INITIAL_PRODUCTS);
   const [visits, setVisits] = useState(() => JSON.parse(localStorage.getItem('lux_visits')) || []);
 
