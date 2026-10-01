@@ -75,6 +75,7 @@ export default function App() {
   const [newSrvModal, setNewSrvModal] = useState(false);
   const [newPrdModal, setNewPrdModal] = useState(false);
   const [editSrvModal, setEditSrvModal] = useState(null); // service object when editing
+  const [editPrdModal, setEditPrdModal] = useState(null); // product object when editing
 
   // New catalog item forms
   const [newSrvName, setNewSrvName] = useState('');
@@ -310,6 +311,26 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
       }]).then();
     }
     setEditSrvModal(null);
+  };
+
+  // Update Retail Product in Catalog
+  const handleUpdateProduct = () => {
+    if (!editPrdModal.name.trim() || !editPrdModal.price) {
+      alert('Please provide valid name and price');
+      return;
+    }
+    const updated = products.map(p => p.id === editPrdModal.id ? editPrdModal : p);
+    setProducts(updated);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_products').upsert([{
+        id: editPrdModal.id,
+        name: editPrdModal.name,
+        price: Number(editPrdModal.price),
+        category: editPrdModal.category
+      }]).then();
+    }
+    setEditPrdModal(null);
   };
 
   // Filtering Visits
@@ -933,6 +954,14 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
                       <span style={{ fontWeight: 700, color: 'var(--emerald)', marginRight: '6px' }}>₹{p.price}</span>
                       <button 
                         className="btn-counter" 
+                        title="Edit / Update Product"
+                        onClick={() => setEditPrdModal({ ...p })}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button 
+                        className="btn-counter" 
+                        title="Delete Product"
                         onClick={() => {
                           if (confirm(`Delete product "${p.name}"?`)) {
                             setProducts(products.filter(item => item.id !== p.id));
@@ -1066,6 +1095,48 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-ghost" onClick={() => setEditSrvModal(null)}>Cancel</button>
               <button className="btn btn-gold" onClick={handleUpdateService}>Update Service</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UPDATE / EDIT RETAIL PRODUCT MODAL */}
+      {editPrdModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="panel-header">
+              <h3>Update Retail Product</h3>
+              <button className="btn-counter" onClick={() => setEditPrdModal(null)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '16px 0' }}>
+              <div className="input-field">
+                <label>Product Name</label>
+                <input 
+                  type="text" 
+                  value={editPrdModal.name} 
+                  onChange={(e) => setEditPrdModal({ ...editPrdModal, name: e.target.value })} 
+                />
+              </div>
+              <div className="input-field">
+                <label>Price (₹)</label>
+                <input 
+                  type="number" 
+                  value={editPrdModal.price} 
+                  onChange={(e) => setEditPrdModal({ ...editPrdModal, price: Number(e.target.value) })} 
+                />
+              </div>
+              <div className="input-field">
+                <label>Category</label>
+                <input 
+                  type="text" 
+                  value={editPrdModal.category} 
+                  onChange={(e) => setEditPrdModal({ ...editPrdModal, category: e.target.value })} 
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="btn btn-ghost" onClick={() => setEditPrdModal(null)}>Cancel</button>
+              <button className="btn btn-gold" onClick={handleUpdateProduct}>Update Product</button>
             </div>
           </div>
         </div>
