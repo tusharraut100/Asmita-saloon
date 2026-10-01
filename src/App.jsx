@@ -321,7 +321,7 @@ export default function App() {
     const itemsText = [srvLines, prdLines].filter(Boolean).join('\n');
 
     const message = 
-`✨ *LUXECUT SALON INVOICE* ✨
+`✨ *ASMITA FAMILY SALON INVOICE* ✨
 ━━━━━━━━━━━━━━━━━━━━
 👤 *Customer:* ${visit.customerName}
 📱 *Phone:* ${visit.customerPhone}
@@ -334,7 +334,7 @@ ${itemsText}
 💵 *Subtotal:* ₹${visit.servicesTotal + visit.productsTotal}
 ${visit.discount > 0 ? `🎁 *Discount Applied:* -₹${visit.discount}\n` : ''}💰 *Total Paid:* ₹${visit.grandTotal} (${visit.paymentMethod})
 ━━━━━━━━━━━━━━━━━━━━
-Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
+Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️`;
 
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/91${visit.customerPhone}?text=${encodedMessage}`;
@@ -519,7 +519,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
             <Scissors size={18} />
           </div>
           <div className="brand-title">
-            <h2 style={{ fontSize: '1.1rem' }}>LUXECUT</h2>
+            <h2 style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>ASMITA FAMILY SALON</h2>
           </div>
         </div>
         <button 
@@ -538,8 +538,8 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
             <Scissors size={22} />
           </div>
           <div className="brand-title">
-            <h2>LUXECUT</h2>
-            <span>Salon & Grooming</span>
+            <h2>ASMITA</h2>
+            <span>Family Salon</span>
           </div>
         </div>
 
@@ -587,13 +587,13 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
         <header className="header-bar">
           <div className="page-info">
             <h1>
-              {activeTab === 'billing' && 'Daily Customer Billing & POS'}
+              {activeTab === 'billing' && 'Daily Customer Billing'}
               {activeTab === 'reports' && 'Salon Sales & Customer Reports'}
               {activeTab === 'services' && 'Manage Salon Services'}
               {activeTab === 'products' && 'Manage Retail Products'}
             </h1>
             <p>
-              {activeTab === 'billing' && 'Select services, add retail products, and create instant bills.'}
+              {activeTab === 'billing' && 'Select services, add retail products, and create instant customer bills.'}
               {activeTab === 'reports' && 'Filter and view your daily, monthly, or custom customer visits and revenue reports.'}
               {activeTab === 'services' && 'Add new salon services or edit existing prices.'}
               {activeTab === 'products' && 'Add new retail grooming products or update their pricing.'}
@@ -1131,7 +1131,7 @@ Thank you for visiting *LuxeCut Salon*! Have a wonderful day ahead! ✂️`;
             </div>
             
             <div className="receipt-slip" id="printable-receipt">
-              <h2>LUXECUT SALON</h2>
+              <h2>ASMITA FAMILY SALON</h2>
               <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#666' }}>Invoice #{activeReceipt.id}</p>
               <div className="divider" style={{ background: '#ddd' }}></div>
               <div style={{ fontSize: '0.8rem', lineHeight: '1.5' }}>
