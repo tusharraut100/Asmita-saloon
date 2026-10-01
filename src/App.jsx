@@ -525,8 +525,8 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
       {/* Mobile Top Navigation Header */}
       <div className="mobile-header">
         <div className="brand-section" style={{ padding: 0, margin: 0, border: 'none' }}>
-          <div className="brand-logo" style={{ width: '36px', height: '36px' }}>
-            <Scissors size={18} />
+          <div className="brand-logo" style={{ width: '38px', height: '38px', overflow: 'hidden', padding: 0 }}>
+            <img src="/logo.jpg" alt="Asmita Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div className="brand-title">
             <h2 style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>ASMITA FAMILY SALON</h2>
@@ -544,8 +544,8 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
       {/* Sidebar Navigation */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="brand-section">
-          <div className="brand-logo">
-            <Scissors size={22} />
+          <div className="brand-logo" style={{ width: '48px', height: '48px', overflow: 'hidden', padding: 0 }}>
+            <img src="/logo.jpg" alt="Asmita Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div className="brand-title">
             <h2>ASMITA</h2>
@@ -559,7 +559,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             onClick={() => { setActiveTab('billing'); setMobileMenuOpen(false); }}
           >
             <PlusCircle size={18} />
-            <span>New Daily Entry</span>
+            <span>New Entry</span>
           </button>
           <button 
             className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
