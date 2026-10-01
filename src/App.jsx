@@ -22,7 +22,8 @@ import {
   Percent, 
   Menu, 
   X,
-  FileText
+  FileText,
+  Home
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -610,6 +611,17 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             </p>
           </div>
           <div className="header-tools">
+            {activeTab !== 'billing' && (
+              <button 
+                className="btn btn-sm btn-gold" 
+                onClick={() => setActiveTab('billing')}
+                title="Go to New Entry"
+                style={{ padding: '8px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Home size={16} />
+                <span>Home</span>
+              </button>
+            )}
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
@@ -690,10 +702,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                         className={`service-card ${isSelected ? 'selected' : ''}`}
                         onClick={() => toggleService(srv)}
                       >
-                        {isSelected && <Check size={16} className="selected-check" />}
-                        <div className="srv-name" style={{ fontSize: '0.95rem' }}>{srv.name}</div>
-                        <div className="srv-meta" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
-                          <span className="srv-price" style={{ fontSize: '1rem' }}>₹{srv.price}</span>
+                        <div className="service-card-top">
+                          <span className="srv-name">{srv.name}</span>
+                          <div className={`service-check-box ${isSelected ? 'checked' : ''}`}>
+                            {isSelected ? <Check size={14} strokeWidth={3} /> : null}
+                          </div>
+                        </div>
+                        <div className="srv-bottom-bar">
+                          <span className="srv-price-pill">₹{srv.price}</span>
                         </div>
                       </div>
                     );
