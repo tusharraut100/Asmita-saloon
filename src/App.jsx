@@ -19,9 +19,12 @@ import {
   Sparkles,
   CreditCard,
   Banknote,
-  QrCode
+  QrCode,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const INITIAL_SERVICES = [
   { id: 's1', name: 'Signature Haircut', category: 'Hair', price: 250 },
@@ -45,6 +48,7 @@ export default function App() {
   const [services, setServices] = useState(() => JSON.parse(localStorage.getItem('lux_services')) || INITIAL_SERVICES);
   const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lux_products')) || INITIAL_PRODUCTS);
   const [visits, setVisits] = useState(() => JSON.parse(localStorage.getItem('lux_visits')) || []);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
   // Form State
   const [customerName, setCustomerName] = useState('');
@@ -75,7 +79,56 @@ export default function App() {
   const [newPrdPrice, setNewPrdPrice] = useState('');
   const [newPrdCat, setNewPrdCat] = useState('Retail');
 
-  // Persistence
+  // Fetch initial data from Supabase if configured
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const fetchCloudData = async () => {
+      setIsCloudSyncing(true);
+      try {
+        const { data: cloudVisits, error: vErr } = await supabase
+          .from('salon_visits')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!vErr && cloudVisits && cloudVisits.length > 0) {
+          const mappedVisits = cloudVisits.map(v => ({
+            id: v.id,
+            customerName: v.customer_name,
+            customerPhone: v.customer_phone,
+            date: v.date,
+            time: v.time,
+            services: v.services || [],
+            products: v.products || [],
+            servicesTotal: Number(v.services_total) || 0,
+            productsTotal: Number(v.products_total) || 0,
+            discount: Number(v.discount) || 0,
+            grandTotal: Number(v.grand_total) || 0,
+            paymentMethod: v.payment_method || 'Cash'
+          }));
+          setVisits(mappedVisits);
+        }
+
+        const { data: cloudServices } = await supabase.from('salon_services').select('*');
+        if (cloudServices && cloudServices.length > 0) {
+          setServices(cloudServices);
+        }
+
+        const { data: cloudProducts } = await supabase.from('salon_products').select('*');
+        if (cloudProducts && cloudProducts.length > 0) {
+          setProducts(cloudProducts);
+        }
+      } catch (err) {
+        console.error('Supabase fetch error:', err);
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    };
+
+    fetchCloudData();
+  }, []);
+
+  // Persistence to LocalStorage
   useEffect(() => {
     localStorage.setItem('lux_services', JSON.stringify(services));
   }, [services]);
@@ -125,7 +178,7 @@ export default function App() {
   };
 
   // Save Customer Visit
-  const handleSaveVisit = (e) => {
+  const handleSaveVisit = async (e) => {
     e.preventDefault();
     if (!customerName.trim()) {
       alert('Please enter customer name');
@@ -158,6 +211,26 @@ export default function App() {
 
     setVisits([newVisit, ...visits]);
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+
+    // Sync to Supabase in background
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_visits').insert([{
+        id: newVisit.id,
+        customer_name: newVisit.customerName,
+        customer_phone: newVisit.customerPhone,
+        date: newVisit.date,
+        time: newVisit.time,
+        services: newVisit.services,
+        products: newVisit.products,
+        services_total: newVisit.servicesTotal,
+        products_total: newVisit.productsTotal,
+        discount: newVisit.discount,
+        grand_total: newVisit.grandTotal,
+        payment_method: newVisit.paymentMethod
+      }]).then(({ error }) => {
+        if (error) console.error('Error uploading to Supabase:', error);
+      });
+    }
 
     // Reset Form
     setCustomerName('');
@@ -293,6 +366,26 @@ export default function App() {
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+            </div>
+            <div 
+              className="badge-date" 
+              style={{
+                borderColor: isSupabaseConfigured ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.3)',
+                color: isSupabaseConfigured ? '#34d399' : '#f87171'
+              }}
+              title={isSupabaseConfigured ? "Connected to Supabase Cloud" : "Local Storage Mode (.env needed for cloud)"}
+            >
+              {isSupabaseConfigured ? (
+                <>
+                  <Cloud size={16} />
+                  <span>{isCloudSyncing ? 'Syncing...' : 'Cloud Synced'}</span>
+                </>
+              ) : (
+                <>
+                  <CloudOff size={16} />
+                  <span>Local Mode</span>
+                </>
+              )}
             </div>
           </div>
         </header>
