@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Scissors, 
   PlusCircle, 
@@ -175,6 +175,16 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lux_visits', JSON.stringify(visits));
   }, [visits]);
+
+  const mainRef = useRef(null);
+
+  // Automatically scroll to the top whenever activeTab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
 
   // Pricing calculations
   const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
@@ -583,7 +593,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
       </aside>
 
       {/* Main Content Area */}
-      <main className="main-wrapper">
+      <main className="main-wrapper" ref={mainRef}>
         <header className="header-bar">
           <div className="page-info">
             <h1>
