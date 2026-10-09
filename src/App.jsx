@@ -30,7 +30,8 @@ import {
   LogOut,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  UserCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -488,6 +489,12 @@ export default function App() {
     setIsServiceDropdownOpen(false);
     setIsProductDropdownOpen(false);
     setActiveReceipt(newVisit);
+
+    // Scroll back to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // WhatsApp Invoice Send Helper
@@ -690,14 +697,28 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     }
   };
 
-  // Filtering Visits
+  // Robust Date Normalizer to 'YYYY-MM-DD'
+  const normalizeDateStr = (dateVal) => {
+    if (!dateVal) return '';
+    if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+      return dateVal;
+    }
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal).split('T')[0] || '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Filtering Visits for Reports
   const filteredVisits = visits.filter(v => {
-    const now = new Date();
-    const vDate = v.date;
+    const vDate = normalizeDateStr(v.date);
+    const today = todayStr;
 
     let dateMatch = true;
     if (filterRange === 'today') {
-      dateMatch = vDate === todayStr;
+      dateMatch = vDate === today;
     } else if (filterRange === 'yesterday') {
       const y = new Date();
       y.setDate(y.getDate() - 1);
@@ -706,54 +727,66 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     } else if (filterRange === 'week') {
       const w = new Date();
       w.setDate(w.getDate() - 7);
-      dateMatch = new Date(vDate) >= w && new Date(vDate) <= now;
+      const wStr = `${w.getFullYear()}-${String(w.getMonth() + 1).padStart(2, '0')}-${String(w.getDate()).padStart(2, '0')}`;
+      dateMatch = vDate >= wStr && vDate <= today;
     } else if (filterRange === 'month') {
-      const d = new Date(vDate);
-      dateMatch = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      const d = new Date();
+      const currentMonthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      dateMatch = vDate.startsWith(currentMonthPrefix);
     } else if (filterRange === 'custom') {
       if (customStart && customEnd) {
         dateMatch = vDate >= customStart && vDate <= customEnd;
+      } else if (customStart) {
+        dateMatch = vDate >= customStart;
+      } else if (customEnd) {
+        dateMatch = vDate <= customEnd;
       }
+    } else if (filterRange === 'all') {
+      dateMatch = true;
     }
 
     if (!dateMatch) return false;
 
     // Staff Filter
-    if (staffFilter !== 'all') {
-      if ((v.employeeName || '') !== staffFilter) return false;
+    if (staffFilter && staffFilter !== 'all') {
+      if ((v.employeeName || '').trim() !== staffFilter.trim()) return false;
     }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
-        v.customerName.toLowerCase().includes(q) || 
-        v.customerPhone.includes(q) ||
-        (v.employeeName && v.employeeName.toLowerCase().includes(q))
+        (v.customerName && v.customerName.toLowerCase().includes(q)) || 
+        (v.customerPhone && v.customerPhone.includes(q)) ||
+        (v.employeeName && v.employeeName.toLowerCase().includes(q)) ||
+        (v.id && v.id.toLowerCase().includes(q))
       );
     }
     return true;
   });
 
   // Analytics Metrics
-  const metricRevenue = filteredVisits.reduce((acc, v) => acc + v.grandTotal, 0);
-  const metricPaidRevenue = filteredVisits.reduce((acc, v) => acc + (v.paidAmount !== undefined ? v.paidAmount : v.grandTotal), 0);
-  const metricPendingTotal = filteredVisits.reduce((acc, v) => acc + (v.pendingAmount || 0), 0);
-  const metricServicesRev = filteredVisits.reduce((acc, v) => acc + v.servicesTotal, 0);
-  const metricProductsRev = filteredVisits.reduce((acc, v) => acc + v.productsTotal, 0);
-  const metricDiscountTotal = filteredVisits.reduce((acc, v) => acc + (v.discount || 0), 0);
+  const metricRevenue = filteredVisits.reduce((acc, v) => acc + (Number(v.grandTotal) || 0), 0);
+  const metricPaidRevenue = filteredVisits.reduce((acc, v) => acc + (v.paidAmount !== undefined ? Number(v.paidAmount) || 0 : Number(v.grandTotal) || 0), 0);
+  const metricPendingTotal = filteredVisits.reduce((acc, v) => acc + (Number(v.pendingAmount) || 0), 0);
+  const metricServicesRev = filteredVisits.reduce((acc, v) => acc + (Number(v.servicesTotal) || 0), 0);
+  const metricProductsRev = filteredVisits.reduce((acc, v) => acc + (Number(v.productsTotal) || 0), 0);
+  const metricDiscountTotal = filteredVisits.reduce((acc, v) => acc + (Number(v.discount) || 0), 0);
   const metricServicesCount = filteredVisits.reduce((acc, v) => acc + (v.services?.length || 0), 0);
-  const metricProductsCount = filteredVisits.reduce((acc, v) => acc + (v.products?.reduce((s, p) => s + p.qty, 0) || 0), 0);
+  const metricProductsCount = filteredVisits.reduce((acc, v) => acc + (v.products?.reduce((s, p) => s + (Number(p.qty) || 1), 0) || 0), 0);
 
   // Staff Work Report Aggregation
-  // Calculate performance metrics for all staff members based on filteredVisits
+  // Calculate performance metrics for all staff members based on the active date filter
   const staffWorkReport = employees.map(emp => {
-    const empVisits = filteredVisits.filter(v => v.employeeName === emp.name);
+    // We match by employee name (case-insensitive & trimmed)
+    const empVisits = filteredVisits.filter(v => 
+      (v.employeeName || '').trim().toLowerCase() === emp.name.trim().toLowerCase()
+    );
     const totalCustomers = empVisits.length;
-    const totalRevenue = empVisits.reduce((sum, v) => sum + v.grandTotal, 0);
-    const totalPaid = empVisits.reduce((sum, v) => sum + (v.paidAmount !== undefined ? v.paidAmount : v.grandTotal), 0);
-    const totalPending = empVisits.reduce((sum, v) => sum + (v.pendingAmount || 0), 0);
+    const totalRevenue = empVisits.reduce((sum, v) => sum + (Number(v.grandTotal) || 0), 0);
+    const totalPaid = empVisits.reduce((sum, v) => sum + (v.paidAmount !== undefined ? Number(v.paidAmount) || 0 : Number(v.grandTotal) || 0), 0);
+    const totalPending = empVisits.reduce((sum, v) => sum + (Number(v.pendingAmount) || 0), 0);
     const totalServicesCount = empVisits.reduce((sum, v) => sum + (v.services?.length || 0), 0);
-    const totalProductsCount = empVisits.reduce((sum, v) => sum + (v.products?.reduce((s, p) => s + p.qty, 0) || 0), 0);
+    const totalProductsCount = empVisits.reduce((sum, v) => sum + (v.products?.reduce((s, p) => s + (Number(p.qty) || 1), 0) || 0), 0);
 
     return {
       id: emp.id,
@@ -1002,14 +1035,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
             className="btn-counter" 
-            onClick={handleLogout} 
-            title="Log Out / Lock Screen"
-            style={{ color: '#f87171', width: '36px', height: '36px' }}
-          >
-            <LogOut size={16} />
-          </button>
-          <button 
-            className="btn-counter" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation"
             style={{ width: '36px', height: '36px' }}
@@ -1089,24 +1114,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <div className="widget-amount">₹{todayRevenue.toLocaleString('en-IN')}</div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.75rem' }}>
-                A
-              </div>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin</div>
-                <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.75rem' }}>
+              A
             </div>
-            <button 
-              className="btn btn-sm btn-ghost" 
-              onClick={handleLogout}
-              title="Sign Out of App"
-              style={{ color: '#f87171', padding: '4px 8px', fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-            >
-              <LogOut size={13} /> Logout
-            </button>
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin Panel</div>
+              <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
+            </div>
           </div>
         </div>
       </aside>
@@ -1150,10 +1165,10 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               className="btn btn-sm btn-ghost" 
               onClick={handleLogout}
               title="Sign Out / Lock App"
-              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 10px', gap: '5px' }}
+              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', gap: '6px' }}
             >
-              <LogOut size={14} />
-              <span className="hide-on-mobile" style={{ fontSize: '0.8rem' }}>Logout</span>
+              <LogOut size={15} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Logout</span>
             </button>
           </div>
         </header>
