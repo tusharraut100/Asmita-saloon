@@ -959,6 +959,20 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </div>
       </div>
 
+      {/* Mobile Backdrop for sidebar drawer */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 999
+          }}
+        />
+      )}
+
       {/* Sidebar Navigation */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="brand-section">
@@ -1014,6 +1028,26 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <div className="widget-label">Today's Revenue</div>
             <div className="widget-amount">₹{todayRevenue.toLocaleString('en-IN')}</div>
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.75rem' }}>
+                A
+              </div>
+              <div style={{ lineHeight: 1.2 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin</div>
+                <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
+              </div>
+            </div>
+            <button 
+              className="btn btn-sm btn-ghost" 
+              onClick={handleLogout}
+              title="Sign Out of App"
+              style={{ color: '#f87171', padding: '4px 8px', fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+            >
+              <LogOut size={13} /> Logout
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -1052,6 +1086,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
+            <button 
+              className="btn btn-sm btn-ghost" 
+              onClick={handleLogout}
+              title="Sign Out / Lock App"
+              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 10px', gap: '5px' }}
+            >
+              <LogOut size={14} />
+              <span className="hide-on-mobile" style={{ fontSize: '0.8rem' }}>Logout</span>
+            </button>
           </div>
         </header>
 

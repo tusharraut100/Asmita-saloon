@@ -937,6 +937,24 @@ body {
     max-height: 90vh;
     overflow-y: auto;
   }
+
+  .login-card {
+    padding: 24px 18px;
+    border-radius: 16px;
+  }
+
+  .login-screen-wrapper {
+    padding: 14px;
+  }
+
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .badge-date {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 /* Extra Small Phones */
@@ -972,6 +990,32 @@ body {
 
   .pay-options {
     grid-template-columns: 1fr;
+  }
+
+  .main-wrapper {
+    padding: 12px 10px;
+  }
+
+  .glass-panel {
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+
+  .page-info h1 {
+    font-size: 1.25rem;
+  }
+
+  .page-info p {
+    font-size: 0.78rem;
+  }
+
+  .header-bar {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .login-card {
+    padding: 20px 14px;
   }
 }
 
