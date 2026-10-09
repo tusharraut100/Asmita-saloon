@@ -38,11 +38,26 @@ CREATE TABLE IF NOT EXISTS salon_products (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Enable Row Level Security (RLS) & Allow Public / Anon Access
+-- 4. Create Employees Table
+CREATE TABLE IF NOT EXISTS salon_employees (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  role TEXT DEFAULT 'Stylist',
+  aadhaar_number TEXT,
+  address TEXT,
+  photo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Enable Row Level Security (RLS) & Allow Public / Anon Access
 ALTER TABLE salon_visits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salon_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salon_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE salon_employees ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read-write for salon_visits" ON salon_visits FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read-write for salon_services" ON salon_services FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read-write for salon_products" ON salon_products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read-write for salon_employees" ON salon_employees FOR ALL USING (true) WITH CHECK (true);
+

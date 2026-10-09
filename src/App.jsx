@@ -23,7 +23,14 @@ import {
   Menu, 
   X,
   FileText,
-  Home
+  Home,
+  Users,
+  MapPin,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
@@ -53,8 +60,29 @@ const INITIAL_PRODUCTS = [
   { id: 'p4', name: 'Beard Softener Conditioner', price: 380 }
 ];
 
+const INITIAL_EMPLOYEES = [
+  {
+    id: 'emp1',
+    name: 'Suresh Kumar',
+    phone: '9876543211',
+    role: 'Senior Stylist & Hair Specialist',
+    aadhaarNumber: 'XXXX-XXXX-4589',
+    address: 'Shop 4, Market Complex, Main Road',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'emp2',
+    name: 'Pooja Verma',
+    phone: '9876543212',
+    role: 'Skin & Facial Expert',
+    aadhaarNumber: 'XXXX-XXXX-8921',
+    address: 'Near City Park, Sector 5',
+    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  }
+];
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'reports' | 'services' | 'products'
+  const [activeTab, setActiveTab] = useState('billing'); // 'billing' | 'reports' | 'services' | 'products' | 'employees'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [services, setServices] = useState(() => {
     const saved = JSON.parse(localStorage.getItem('lux_services'));
@@ -67,6 +95,10 @@ export default function App() {
     return Array.from(map.values());
   });
   const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lux_products')) || INITIAL_PRODUCTS);
+  const [employees, setEmployees] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem('lux_employees'));
+    return (saved && saved.length > 0) ? saved : INITIAL_EMPLOYEES;
+  });
   const [visits, setVisits] = useState(() => JSON.parse(localStorage.getItem('lux_visits')) || []);
 
   // Accurate Local Today Date (YYYY-MM-DD)
@@ -80,10 +112,89 @@ export default function App() {
 
   const todayStr = getLocalTodayDate();
 
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('lux_auth') === 'true';
+  });
+  const [adminPassword, setAdminPassword] = useState(() => {
+    return localStorage.getItem('lux_admin_pwd') || 'admin123';
+  });
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  // Forgot Password Modal State
+  const [forgotModal, setForgotModal] = useState(false);
+  const [resetSecurityCode, setResetSecurityCode] = useState('');
+  const [newPasswordVal, setNewPasswordVal] = useState('');
+  const [confirmPasswordVal, setConfirmPasswordVal] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Handle Login
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (loginUsername === 'admin' && loginPassword === adminPassword) {
+      setIsAuthenticated(true);
+      localStorage.setItem('lux_auth', 'true');
+      setAuthError('');
+    } else {
+      setAuthError('Invalid credentials! Check your username and password.');
+    }
+  };
+
+  // Handle Reset Password
+  const handleResetPassword = (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+
+    // Master Salon recovery PIN / security verification
+    if (resetSecurityCode.trim() !== '7788' && resetSecurityCode.trim().toLowerCase() !== 'asmita') {
+      setForgotError('Invalid Security PIN! Enter the salon master security key (Default: 7788 or ASMITA)');
+      return;
+    }
+
+    if (!newPasswordVal || newPasswordVal.length < 4) {
+      setForgotError('New password must be at least 4 characters long.');
+      return;
+    }
+
+    if (newPasswordVal !== confirmPasswordVal) {
+      setForgotError('Passwords do not match! Please re-type correctly.');
+      return;
+    }
+
+    setAdminPassword(newPasswordVal);
+    localStorage.setItem('lux_admin_pwd', newPasswordVal);
+    setForgotSuccess('✅ Password successfully updated! You can now log in.');
+    setLoginPassword(newPasswordVal);
+
+    setTimeout(() => {
+      setForgotModal(false);
+      setForgotSuccess('');
+      setResetSecurityCode('');
+      setNewPasswordVal('');
+      setConfirmPasswordVal('');
+    }, 1500);
+  };
+
+  // Handle Logout
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to log out?')) {
+      setIsAuthenticated(false);
+      localStorage.removeItem('lux_auth');
+    }
+  };
+
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [visitDate, setVisitDate] = useState(todayStr);
+  const [assignedEmployee, setAssignedEmployee] = useState('');
+  const [serviceSearchTerm, setServiceSearchTerm] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [discount, setDiscount] = useState(0);
@@ -101,13 +212,28 @@ export default function App() {
   const [newPrdModal, setNewPrdModal] = useState(false);
   const [editSrvModal, setEditSrvModal] = useState(null); // service object when editing
   const [editPrdModal, setEditPrdModal] = useState(null); // product object when editing
+  const [newEmpModal, setNewEmpModal] = useState(false);
+  const [viewEmpModal, setViewEmpModal] = useState(null); // employee details preview
 
   // New catalog item forms
   const [newSrvName, setNewSrvName] = useState('');
   const [newSrvPrice, setNewSrvPrice] = useState('');
 
+  // Quick Add Service from Billing
+  const [quickSrvName, setQuickSrvName] = useState('');
+  const [quickSrvPrice, setQuickSrvPrice] = useState('');
+
   const [newPrdName, setNewPrdName] = useState('');
   const [newPrdPrice, setNewPrdPrice] = useState('');
+
+  // New employee form state
+  const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpPhone, setNewEmpPhone] = useState('');
+  const [newEmpRole, setNewEmpRole] = useState('Senior Stylist');
+  const [newEmpAadhaar, setNewEmpAadhaar] = useState('');
+  const [newEmpAddress, setNewEmpAddress] = useState('');
+  const [newEmpPhoto, setNewEmpPhoto] = useState('');
+
 
   // Fetch initial data from Supabase if configured
   useEffect(() => {
@@ -133,7 +259,8 @@ export default function App() {
             productsTotal: Number(v.products_total) || 0,
             discount: Number(v.discount) || 0,
             grandTotal: Number(v.grand_total) || 0,
-            paymentMethod: v.payment_method || 'Cash'
+            paymentMethod: v.payment_method || 'Cash',
+            employeeName: v.employee_name || ''
           }));
           setVisits(mappedVisits);
         }
@@ -156,6 +283,23 @@ export default function App() {
             return Array.from(map.values());
           });
         }
+
+        const { data: cloudEmployees } = await supabase.from('salon_employees').select('*');
+        if (cloudEmployees && cloudEmployees.length > 0) {
+          setEmployees(prev => {
+            const map = new Map(prev.map(e => [e.id, e]));
+            cloudEmployees.forEach(e => map.set(e.id, {
+              id: e.id,
+              name: e.name,
+              phone: e.phone || '',
+              role: e.role || 'Senior Stylist',
+              aadhaarNumber: e.aadhaar_number || '',
+              address: e.address || '',
+              photoUrl: e.photo_url || ''
+            }));
+            return Array.from(map.values());
+          });
+        }
       } catch (err) {
         console.error('Supabase fetch error:', err);
       }
@@ -172,6 +316,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lux_products', JSON.stringify(products));
   }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem('lux_employees', JSON.stringify(employees));
+  }, [employees]);
 
   useEffect(() => {
     localStorage.setItem('lux_visits', JSON.stringify(visits));
@@ -276,6 +424,7 @@ export default function App() {
       customerPhone: customerPhone.trim() || 'Walk-in',
       date: visitDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      employeeName: assignedEmployee.trim(),
       services: [...selectedServices],
       products: recordedProducts,
       servicesTotal,
@@ -296,6 +445,7 @@ export default function App() {
         customer_phone: newVisit.customerPhone,
         date: newVisit.date,
         time: newVisit.time,
+        employee_name: newVisit.employeeName,
         services: newVisit.services,
         products: newVisit.products,
         services_total: newVisit.servicesTotal,
@@ -309,11 +459,12 @@ export default function App() {
     }
 
     // Success Alert after adding customer
-    alert(`✅ Customer Visit Successfully Added!\n\nCustomer: ${newVisit.customerName}\nTotal Bill: ₹${newVisit.grandTotal}\nPayment: ${newVisit.paymentMethod}`);
+    alert(`✅ Customer Visit Successfully Added!\n\nCustomer: ${newVisit.customerName}\nStylist/Staff: ${newVisit.employeeName || 'Unassigned'}\nTotal Bill: ₹${newVisit.grandTotal}\nPayment: ${newVisit.paymentMethod}`);
 
     // Reset Form
     setCustomerName('');
     setCustomerPhone('');
+    setAssignedEmployee('');
     setSelectedServices([]);
     setSelectedProducts({});
     setDiscount(0);
@@ -338,7 +489,7 @@ export default function App() {
 📱 *Phone:* ${visit.customerPhone}
 📅 *Date:* ${visit.date} ${visit.time}
 🧾 *Invoice #:* ${visit.id}
-
+${visit.employeeName ? `✂️ *Stylist / Served By:* ${visit.employeeName}\n` : ''}
 💇 *Services & Products:*
 ${itemsText}
 ━━━━━━━━━━━━━━━━━━━━
@@ -459,6 +610,67 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     alert(`✅ New product "${newProductObj.name}" added successfully!`);
   };
 
+  // Add New Staff with photo, aadhaar, address
+  const handleAddNewEmployee = () => {
+    if (!newEmpName.trim()) {
+      alert('Please enter staff name');
+      return;
+    }
+    if (newEmpPhone && newEmpPhone.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number for staff');
+      return;
+    }
+
+    const newEmpObj = {
+      id: 'emp_' + Date.now(),
+      name: newEmpName.trim(),
+      phone: newEmpPhone.trim(),
+      role: newEmpRole.trim() || 'Stylist',
+      aadhaarNumber: newEmpAadhaar.trim(),
+      address: newEmpAddress.trim(),
+      photoUrl: newEmpPhoto.trim()
+    };
+
+    setEmployees(prev => [newEmpObj, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_employees').insert([{
+        id: newEmpObj.id,
+        name: newEmpObj.name,
+        phone: newEmpObj.phone,
+        role: newEmpObj.role,
+        aadhaar_number: newEmpObj.aadhaarNumber,
+        address: newEmpObj.address,
+        photo_url: newEmpObj.photoUrl
+      }]).then(({ error }) => {
+        if (error) console.error('Error saving staff to Supabase:', error);
+      });
+    }
+
+    setNewEmpName('');
+    setNewEmpPhone('');
+    setNewEmpRole('Senior Stylist');
+    setNewEmpAadhaar('');
+    setNewEmpAddress('');
+    setNewEmpPhoto('');
+    setNewEmpModal(false);
+    alert(`✅ Staff member "${newEmpObj.name}" added successfully!`);
+  };
+
+  // Delete Staff
+  const handleDeleteEmployee = (empId, empName) => {
+    if (confirm(`Are you sure you want to delete staff member "${empName}"?`)) {
+      setEmployees(prev => prev.filter(e => e.id !== empId));
+      if (isSupabaseConfigured && supabase) {
+        supabase.from('salon_employees').delete().eq('id', empId).then();
+      }
+      if (assignedEmployee === empName) {
+        setAssignedEmployee('');
+      }
+      alert(`🗑️ Staff member "${empName}" deleted.`);
+    }
+  };
+
   // Filtering Visits
   const filteredVisits = visits.filter(v => {
     const now = new Date();
@@ -489,7 +701,11 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return v.customerName.toLowerCase().includes(q) || v.customerPhone.includes(q);
+      return (
+        v.customerName.toLowerCase().includes(q) || 
+        v.customerPhone.includes(q) ||
+        (v.employeeName && v.employeeName.toLowerCase().includes(q))
+      );
     }
     return true;
   });
@@ -505,11 +721,11 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
   // CSV Export
   const handleExportCSV = () => {
     if (filteredVisits.length === 0) return alert('No records to export');
-    let csv = "Invoice,Date,Time,Customer,Phone,Services,Products,Payment,Discount,Total\n";
+    let csv = "Invoice,Date,Time,Customer,Phone,Stylist_Staff,Services,Products,Payment,Discount,Total\n";
     filteredVisits.forEach(v => {
       const srvs = v.services.map(s => s.name).join(' | ');
       const prds = v.products.map(p => `${p.name} (x${p.qty})`).join(' | ');
-      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${srvs}","${prds}","${v.paymentMethod}","${v.discount}","${v.grandTotal}"\n`;
+      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${v.employeeName || 'Unassigned'}","${srvs}","${prds}","${v.paymentMethod}","${v.discount}","${v.grandTotal}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -520,6 +736,202 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     link.click();
     document.body.removeChild(link);
   };
+
+  // If not authenticated, show professional Login Screen
+  if (!isAuthenticated) {
+    return (
+      <div className="login-screen-wrapper">
+        <div className="login-card">
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div 
+              style={{ 
+                width: '68px', 
+                height: '68px', 
+                borderRadius: '16px', 
+                background: 'linear-gradient(135deg, var(--gold), #99751e)', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                boxShadow: '0 8px 25px var(--gold-glow)',
+                marginBottom: '14px',
+                overflow: 'hidden'
+              }}
+            >
+              <img src="/logo.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: '#fff', letterSpacing: '1px' }}>
+              ASMITA FAMILY SALON
+            </h2>
+            <p style={{ color: 'var(--gold)', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: '4px' }}>
+              Management Portal
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {authError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', textAlign: 'center' }}>
+                {authError}
+              </div>
+            )}
+
+            <div className="input-field">
+              <label>Username / Login ID</label>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type="text" 
+                  placeholder="Enter username (e.g. admin)" 
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  required
+                  style={{ width: '100%', paddingLeft: '38px' }}
+                />
+                <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gold)' }} />
+              </div>
+            </div>
+
+            <div className="input-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ margin: 0 }}>Password</label>
+                <button
+                  type="button"
+                  onClick={() => setForgotModal(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  placeholder="Enter password" 
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  style={{ width: '100%', paddingLeft: '38px', paddingRight: '40px' }}
+                />
+                <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gold)' }} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    background: 'none', 
+                    border: 'none', 
+                    color: 'var(--text-muted)', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    padding: '4px'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-gold" 
+              style={{ marginTop: '8px', padding: '12px', fontSize: '0.96rem', width: '100%' }}
+            >
+              <ShieldCheck size={18} /> Sign In & Access Dashboard
+            </button>
+
+            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px' }}>
+              🔒 Protected Staff & Admin Portal • Default: <code>admin</code> / <code>admin123</code>
+            </div>
+          </form>
+
+          {/* FORGOT / RESET PASSWORD MODAL */}
+          {forgotModal && (
+            <div className="modal-backdrop">
+              <div className="modal-card" style={{ maxWidth: '420px', textAlign: 'left' }}>
+                <div className="panel-header">
+                  <h3>Reset Admin Password</h3>
+                  <button className="btn-counter" onClick={() => setForgotModal(false)}>✕</button>
+                </div>
+
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  Verify your Salon Security Recovery PIN to set a new password.
+                </p>
+
+                {forgotError && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', marginBottom: '12px' }}>
+                    {forgotError}
+                  </div>
+                )}
+
+                {forgotSuccess && (
+                  <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#34d399', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', marginBottom: '12px' }}>
+                    {forgotSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="input-field">
+                    <label>Master Security PIN / Key *</label>
+                    <input 
+                      type="text" 
+                      placeholder="Enter Master PIN (Default: 7788 or ASMITA)"
+                      value={resetSecurityCode}
+                      onChange={(e) => setResetSecurityCode(e.target.value)}
+                      required
+                    />
+                    <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Default salon recovery key is <strong>7788</strong> or <strong>ASMITA</strong></small>
+                  </div>
+
+                  <div className="input-field">
+                    <label>New Password *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type={showNewPassword ? 'text' : 'password'} 
+                        placeholder="Enter new password (min 4 chars)"
+                        value={newPasswordVal}
+                        onChange={(e) => setNewPasswordVal(e.target.value)}
+                        required
+                        style={{ width: '100%', paddingRight: '40px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                      >
+                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="input-field">
+                    <label>Confirm New Password *</label>
+                    <input 
+                      type="password" 
+                      placeholder="Re-enter new password"
+                      value={confirmPasswordVal}
+                      onChange={(e) => setConfirmPasswordVal(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                    <button type="button" className="btn btn-ghost" onClick={() => setForgotModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-gold">
+                      Update Password
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -533,13 +945,23 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <h2 style={{ fontSize: '1rem', whiteSpace: 'nowrap' }}>ASMITA FAMILY SALON</h2>
           </div>
         </div>
-        <button 
-          className="btn-counter" 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle Navigation"
-        >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button 
+            className="btn-counter" 
+            onClick={handleLogout} 
+            title="Log Out"
+            style={{ color: '#f87171' }}
+          >
+            <LogOut size={16} />
+          </button>
+          <button 
+            className="btn-counter" 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle Navigation"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Navigation */}
@@ -583,6 +1005,13 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <ShoppingBag size={18} />
             <span>Retail Products</span>
           </button>
+          <button 
+            className={`nav-item ${activeTab === 'employees' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('employees'); setMobileMenuOpen(false); }}
+          >
+            <Users size={18} />
+            <span>Staff ({employees.length})</span>
+          </button>
         </nav>
 
         <div className="sidebar-bottom">
@@ -590,6 +1019,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <div className="widget-label">Today's Revenue</div>
             <div className="widget-amount">₹{todayRevenue.toLocaleString('en-IN')}</div>
           </div>
+
+          <button 
+            className="btn btn-sm btn-ghost btn-block" 
+            onClick={handleLogout}
+            style={{ marginTop: '14px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.25)' }}
+          >
+            <LogOut size={15} /> Sign Out
+          </button>
         </div>
       </aside>
 
@@ -602,12 +1039,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               {activeTab === 'reports' && 'Salon Sales & Customer Reports'}
               {activeTab === 'services' && 'Manage Salon Services'}
               {activeTab === 'products' && 'Manage Retail Products'}
+              {activeTab === 'employees' && 'Staff & Team Management'}
             </h1>
             <p>
-              {activeTab === 'billing' && 'Select services, add retail products, and create instant customer bills.'}
+              {activeTab === 'billing' && 'Select services, assign working staff/stylist, and create instant bills.'}
               {activeTab === 'reports' && 'Filter and view your daily, monthly, or custom customer visits and revenue reports.'}
               {activeTab === 'services' && 'Add new salon services or edit existing prices.'}
               {activeTab === 'products' && 'Add new retail grooming products or update their pricing.'}
+              {activeTab === 'employees' && 'Manage salon team, Aadhaar cards, photos, contact details, and stylist profiles.'}
             </p>
           </div>
           <div className="header-tools">
@@ -626,6 +1065,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
+            <button 
+              className="btn btn-sm btn-ghost" 
+              onClick={handleLogout}
+              title="Sign Out"
+              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </header>
 
@@ -638,7 +1085,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 <div className="panel-title">
                   <User size={18} /> 1. Customer Details
                 </div>
-                <div className="form-grid-2" style={{ marginTop: '14px' }}>
+                <div className="form-grid-2" style={{ marginTop: '16px' }}>
                   <div className="input-field">
                     <label>Customer Name *</label>
                     <input 
@@ -649,29 +1096,26 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     />
                   </div>
                   <div className="input-field">
-                    <label>Mobile Number (10 Digits)</label>
-                    <div style={{ position: 'relative' }}>
-                      <input 
-                        type="tel" 
-                        placeholder="9876543210" 
-                        maxLength={10}
-                        value={customerPhone}
-                        onChange={handlePhoneChange}
-                        style={{ width: '100%' }}
-                      />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ margin: 0 }}>Mobile Number (10 Digits)</label>
                       {customerPhone && (
                         <span style={{ 
-                          position: 'absolute', 
-                          right: '10px', 
-                          top: '50%', 
-                          transform: 'translateY(-50%)', 
                           fontSize: '0.72rem', 
+                          fontWeight: 600,
                           color: customerPhone.length === 10 ? '#34d399' : '#f87171' 
                         }}>
-                          {customerPhone.length}/10
+                          {customerPhone.length}/10 {customerPhone.length === 10 ? '✓' : ''}
                         </span>
                       )}
                     </div>
+                    <input 
+                      type="tel" 
+                      placeholder="e.g. 9876543210" 
+                      maxLength={10}
+                      value={customerPhone}
+                      onChange={handlePhoneChange}
+                      style={{ width: '100%' }}
+                    />
                   </div>
                   <div className="input-field">
                     <label>Visit Date (Max: Today)</label>
@@ -682,10 +1126,24 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       onChange={handleDateChange}
                     />
                   </div>
+                  <div className="input-field">
+                    <label>Assigned Stylist / Staff</label>
+                    <select 
+                      value={assignedEmployee}
+                      onChange={(e) => setAssignedEmployee(e.target.value)}
+                    >
+                      <option value="">-- Choose Working Staff --</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name} ({emp.role || 'Staff / Stylist'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Services Selector Card (Without Category) */}
+              {/* Services Selector Card - Clean dropdown & search like Employee selector */}
               <div className="glass-panel" style={{ marginTop: '20px' }}>
                 <div className="panel-header">
                   <div className="panel-title">
@@ -693,27 +1151,187 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   </div>
                   <span className="badge-pill">{selectedServices.length} Selected</span>
                 </div>
-                <div className="service-selector-grid">
-                  {services.map(srv => {
-                    const isSelected = selectedServices.some(s => s.id === srv.id);
-                    return (
-                      <div 
-                        key={srv.id} 
-                        className={`service-card ${isSelected ? 'selected' : ''}`}
-                        onClick={() => toggleService(srv)}
-                      >
-                        <div className="service-card-top">
-                          <span className="srv-name">{srv.name}</span>
-                          <div className={`service-check-box ${isSelected ? 'checked' : ''}`}>
-                            {isSelected ? <Check size={14} strokeWidth={3} /> : null}
-                          </div>
-                        </div>
-                        <div className="srv-bottom-bar">
-                          <span className="srv-price-pill">₹{srv.price}</span>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Unified Live Search & Dropdown Box */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ position: 'relative' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '10px', 
+                          background: 'rgba(10, 12, 16, 0.85)', 
+                          padding: '10px 14px', 
+                          borderRadius: '8px', 
+                          border: '1px solid var(--border)' 
+                        }}>
+                          <Search size={16} color="var(--gold)" />
+                          <input 
+                            type="text" 
+                            placeholder="Type service name to search (e.g. Haircut, Beard, Facial)..." 
+                            value={serviceSearchTerm}
+                            onChange={(e) => setServiceSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const filtered = services.filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()));
+                                if (filtered.length > 0) {
+                                  const targetSrv = filtered[0];
+                                  if (!selectedServices.some(sel => sel.id === targetSrv.id)) {
+                                    setSelectedServices([...selectedServices, targetSrv]);
+                                  }
+                                  setServiceSearchTerm('');
+                                }
+                              }
+                            }}
+                            style={{ background: 'transparent', border: 'none', padding: 0, width: '100%', color: '#fff', fontSize: '0.92rem', outline: 'none' }}
+                          />
+                          {serviceSearchTerm && (
+                            <button 
+                              type="button"
+                              onClick={() => setServiceSearchTerm('')} 
+                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-outline-gold"
+                        onClick={() => setNewSrvModal(true)}
+                        style={{ whiteSpace: 'nowrap', padding: '10px 14px' }}
+                      >
+                        <Plus size={14} /> New Service
+                      </button>
+                    </div>
+
+                    {/* Instant Search Results Panel */}
+                    {serviceSearchTerm.trim() && (
+                      <div style={{ 
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 50,
+                        marginTop: '4px',
+                        background: '#131822', 
+                        border: '1px solid var(--border-gold)', 
+                        borderRadius: '10px', 
+                        maxHeight: '220px', 
+                        overflowY: 'auto', 
+                        padding: '6px', 
+                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7)',
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '4px' 
+                      }}>
+                        {services
+                          .filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()))
+                          .map(s => {
+                            const isAlready = selectedServices.some(sel => sel.id === s.id);
+                            return (
+                              <div 
+                                key={s.id} 
+                                onClick={() => {
+                                  if (!isAlready) {
+                                    setSelectedServices([...selectedServices, s]);
+                                  }
+                                  setServiceSearchTerm('');
+                                }}
+                                style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  padding: '9px 12px', 
+                                  borderRadius: '6px', 
+                                  background: isAlready ? 'rgba(212, 175, 55, 0.12)' : 'rgba(255, 255, 255, 0.04)', 
+                                  cursor: isAlready ? 'default' : 'pointer',
+                                  fontSize: '0.9rem',
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isAlready) e.currentTarget.style.background = 'rgba(212, 175, 55, 0.18)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isAlready) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{s.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ color: 'var(--gold)', fontWeight: 700 }}>₹{s.price}</span>
+                                  {isAlready ? (
+                                    <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>Added ✓</span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#000', background: 'var(--gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>+ Add</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        {services.filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.84rem' }}>
+                            No service matching "{serviceSearchTerm}". Click "+ New Service" to create it.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown Quick Picker for Users Who Prefer Dropdown */}
+                  <div className="input-field" style={{ margin: 0 }}>
+                    <select 
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        const srv = services.find(s => s.id === val);
+                        if (srv && !selectedServices.some(s => s.id === srv.id)) {
+                          setSelectedServices([...selectedServices, srv]);
+                        }
+                      }}
+                    >
+                      <option value="">-- Or Select from All Services Dropdown --</option>
+                      {services
+                        .filter(s => !selectedServices.some(sel => sel.id === s.id))
+                        .map(srv => (
+                          <option key={srv.id} value={srv.id}>
+                            {srv.name} — ₹{srv.price}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Selected Services Tags / List */}
+                  <div>
+                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                      Selected Services ({selectedServices.length}):
+                    </label>
+                    {selectedServices.length === 0 ? (
+                      <div style={{ padding: '12px', background: 'rgba(10, 12, 16, 0.4)', borderRadius: '8px', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                        No services selected yet. Choose a service from the dropdown above.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {selectedServices.map(srv => (
+                          <div key={srv.id} className="service-pill-tag">
+                            <span>{srv.name}</span>
+                            <span style={{ color: '#fff', marginLeft: '4px' }}>₹{srv.price}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => toggleService(srv)}
+                              title="Remove service"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -983,6 +1601,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     <tr>
                       <th>Date & Time</th>
                       <th>Customer Details</th>
+                      <th>Stylist / Staff</th>
                       <th>Services</th>
                       <th>Products</th>
                       <th>Discount</th>
@@ -993,7 +1612,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   <tbody>
                     {filteredVisits.length === 0 ? (
                       <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
                           No customer entries found for this filter.
                         </td>
                       </tr>
@@ -1007,6 +1626,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           <td>
                             <strong>{v.customerName}</strong><br />
                             <small style={{ color: 'var(--text-dim)' }}>{v.customerPhone}</small>
+                          </td>
+                          <td>
+                            {v.employeeName ? (
+                              <span className="badge-tag-staff">
+                                <User size={12} /> {v.employeeName}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>Unassigned</span>
+                            )}
                           </td>
                           <td>
                             {v.services.length > 0 ? v.services.map(s => (
@@ -1145,6 +1773,100 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             </div>
           </div>
         )}
+
+        {/* TAB 5: EMPLOYEES / STAFF MANAGEMENT TAB */}
+        {activeTab === 'employees' && (
+          <div className="glass-panel">
+            <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+              <div className="panel-title">
+                <Users size={20} /> Team Members & Staff ({employees.length})
+              </div>
+              <button className="btn btn-sm btn-gold" onClick={() => setNewEmpModal(true)}>
+                <Plus size={14} /> Add New Staff
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Manage your salon staff, Aadhaar cards, profile photos, contact numbers, and service assignments.
+            </p>
+
+            {employees.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                No staff registered yet. Click "+ Add New Staff" to register staff.
+              </div>
+            ) : (
+              <div className="employee-grid">
+                {employees.map(emp => (
+                  <div key={emp.id} className="employee-card">
+                    <div>
+                      <div className="emp-card-header">
+                        {emp.photoUrl ? (
+                          <img 
+                            src={emp.photoUrl} 
+                            alt={emp.name} 
+                            className="emp-avatar" 
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+                            }}
+                          />
+                        ) : (
+                          <div className="emp-avatar">
+                            <User size={28} />
+                          </div>
+                        )}
+                        <div className="emp-info">
+                          <h4>{emp.name}</h4>
+                          <span className="emp-role-tag">{emp.role || 'Staff / Stylist'}</span>
+                          {emp.phone && (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              📞 {emp.phone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="emp-details-list" style={{ marginTop: '14px' }}>
+                        <div className="emp-detail-row">
+                          <FileText size={14} />
+                          <div>
+                            <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Aadhaar Card:</span><br />
+                            <strong>{emp.aadhaarNumber || 'Not Uploaded / Provided'}</strong>
+                          </div>
+                        </div>
+                        <div className="emp-detail-row">
+                          <MapPin size={14} />
+                          <div>
+                            <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Address:</span><br />
+                            <span>{emp.address || 'Address not added'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      <button 
+                        className="btn btn-sm btn-ghost" 
+                        onClick={() => setViewEmpModal(emp)}
+                        title="View Full ID Card"
+                      >
+                        View ID
+                      </button>
+                      <button 
+                        className="btn btn-sm" 
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                        onClick={() => handleDeleteEmployee(emp.id, emp.name)}
+                        title="Delete Staff"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* RECEIPT MODAL WITH WHATSAPP ACTION & DISCOUNT DISPLAY */}
@@ -1164,6 +1886,9 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 <div><strong>Customer:</strong> {activeReceipt.customerName}</div>
                 <div><strong>Phone:</strong> {activeReceipt.customerPhone}</div>
                 <div><strong>Date:</strong> {activeReceipt.date} {activeReceipt.time}</div>
+                {activeReceipt.employeeName && (
+                  <div><strong>Stylist / Served By:</strong> {activeReceipt.employeeName}</div>
+                )}
                 <div><strong>Payment:</strong> {activeReceipt.paymentMethod}</div>
               </div>
               <div className="divider" style={{ background: '#ddd' }}></div>
@@ -1334,6 +2059,204 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-gold" onClick={handleAddNewProduct}>Save Product</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD EMPLOYEE MODAL */}
+      {newEmpModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '500px' }}>
+            <div className="panel-header">
+              <h3>Register New Staff</h3>
+              <button className="btn-counter" onClick={() => setNewEmpModal(false)}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '16px 0' }}>
+              <div className="input-field">
+                <label>Staff Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Vikram Sharma" 
+                  value={newEmpName} 
+                  onChange={(e) => setNewEmpName(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-field">
+                  <label>Mobile Number (10 Digits)</label>
+                  <input 
+                    type="tel" 
+                    placeholder="9876543210" 
+                    maxLength={10}
+                    value={newEmpPhone} 
+                    onChange={(e) => setNewEmpPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                  />
+                </div>
+                <div className="input-field">
+                  <label>Designation / Role</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Senior Hair Stylist" 
+                    value={newEmpRole} 
+                    onChange={(e) => setNewEmpRole(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="input-field">
+                <label>Aadhaar Card Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 1234 5678 9012" 
+                  value={newEmpAadhaar} 
+                  onChange={(e) => setNewEmpAadhaar(e.target.value)} 
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Full Residential Address</label>
+                <textarea 
+                  rows={2}
+                  placeholder="e.g. House No 12, Gandhi Nagar, Near Main Market"
+                  value={newEmpAddress}
+                  onChange={(e) => setNewEmpAddress(e.target.value)}
+                  style={{
+                    background: 'rgba(10, 12, 16, 0.8)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '0.92rem',
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Staff Photo (Upload Image or Paste URL)</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Image URL (or select file below)" 
+                    value={newEmpPhoto} 
+                    onChange={(e) => setNewEmpPhoto(e.target.value)} 
+                    style={{ flex: 1 }}
+                  />
+                  <label 
+                    className="btn btn-sm btn-ghost" 
+                    style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '10px 14px' }}
+                  >
+                    Upload File
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert('Please select an image smaller than 2MB');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setNewEmpPhoto(event.target.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {newEmpPhoto && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                    <img 
+                      src={newEmpPhoto} 
+                      alt="Preview" 
+                      style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-gold)' }} 
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#34d399' }}>✓ Photo attached</span>
+                    <button 
+                      type="button" 
+                      className="btn-counter" 
+                      style={{ width: '22px', height: '22px', fontSize: '0.7rem' }}
+                      onClick={() => setNewEmpPhoto('')}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="btn btn-ghost" onClick={() => setNewEmpModal(false)}>Cancel</button>
+              <button className="btn btn-gold" onClick={handleAddNewEmployee}>Save Staff</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW EMPLOYEE DETAILS MODAL */}
+      {viewEmpModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="panel-header">
+              <h3>Staff Profile & ID</h3>
+              <button className="btn-counter" onClick={() => setViewEmpModal(null)}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: '16px 0', gap: '12px' }}>
+              {viewEmpModal.photoUrl ? (
+                <img 
+                  src={viewEmpModal.photoUrl} 
+                  alt={viewEmpModal.name} 
+                  style={{ width: '100px', height: '100px', borderRadius: '20px', objectFit: 'cover', border: '3px solid var(--gold)', boxShadow: '0 8px 25px var(--gold-glow)' }}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+                  }}
+                />
+              ) : (
+                <div style={{ width: '100px', height: '100px', borderRadius: '20px', background: 'rgba(212, 175, 55, 0.15)', border: '3px solid var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: varGold => 'var(--gold)' }}>
+                  <User size={48} color="var(--gold)" />
+                </div>
+              )}
+
+              <div>
+                <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '4px' }}>{viewEmpModal.name}</h3>
+                <span className="emp-role-tag">{viewEmpModal.role || 'Staff / Stylist'}</span>
+              </div>
+
+              <div style={{ width: '100%', background: 'rgba(10, 12, 16, 0.7)', borderRadius: '12px', border: '1px solid var(--border)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left', fontSize: '0.86rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-dim)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Phone Number:</span>
+                  <div style={{ fontWeight: 600, color: '#fff', marginTop: '2px' }}>{viewEmpModal.phone || 'Not provided'}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Aadhaar Card:</span>
+                  <div style={{ fontWeight: 700, color: 'var(--gold)', letterSpacing: '1px', marginTop: '2px' }}>
+                    {viewEmpModal.aadhaarNumber || 'Not Uploaded / Provided'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-dim)', fontSize: '0.74rem', textTransform: 'uppercase' }}>Residential Address:</span>
+                  <div style={{ color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.4' }}>
+                    {viewEmpModal.address || 'Address not registered'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="btn btn-gold btn-block" onClick={() => setViewEmpModal(null)}>
+                Close
+              </button>
             </div>
           </div>
         </div>
