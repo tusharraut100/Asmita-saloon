@@ -1389,6 +1389,8 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                                   key={s.id}
                                   onClick={() => {
                                     toggleService(s);
+                                    setIsServiceDropdownOpen(false);
+                                    setServiceDropdownSearch('');
                                   }}
                                   style={{
                                     display: 'flex',
@@ -1428,7 +1430,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           <button 
                             type="button" 
                             className="btn btn-sm btn-outline-gold"
-                            onClick={() => setIsServiceDropdownOpen(false)}
+                            onClick={() => { setIsServiceDropdownOpen(false); setServiceDropdownSearch(''); }}
                             style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                           >
                             Done Selecting
@@ -1580,6 +1582,8 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                                   key={p.id}
                                   onClick={() => {
                                     adjustProductQty(p.id, 1);
+                                    setIsProductDropdownOpen(false);
+                                    setProductDropdownSearch('');
                                   }}
                                   style={{
                                     display: 'flex',
@@ -1623,7 +1627,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           <button 
                             type="button" 
                             className="btn btn-sm btn-outline-gold"
-                            onClick={() => setIsProductDropdownOpen(false)}
+                            onClick={() => { setIsProductDropdownOpen(false); setProductDropdownSearch(''); }}
                             style={{ padding: '4px 12px', fontSize: '0.8rem', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
                           >
                             Done Selecting
