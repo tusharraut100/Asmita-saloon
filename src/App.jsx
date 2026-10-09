@@ -739,6 +739,34 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     }
   };
 
+  // Clear Remaining Due for a Visit and update receipt
+  const handleClearDue = (visit) => {
+    const updatedVisit = {
+      ...visit,
+      paidAmount: visit.grandTotal,
+      pendingAmount: 0
+    };
+
+    const updatedVisits = visits.map(v => v.id === visit.id ? updatedVisit : v);
+    setVisits(updatedVisits);
+    localStorage.setItem('lux_visits', JSON.stringify(updatedVisits));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_visits')
+        .update({
+          paid_amount: visit.grandTotal,
+          pending_amount: 0
+        })
+        .eq('id', visit.id)
+        .then(({ error }) => {
+          if (error) console.error('Error clearing due in Supabase:', error);
+        });
+    }
+
+    // Immediately open receipt showing all amount is paid
+    setActiveReceipt(updatedVisit);
+  };
+
   // Robust Date Normalizer to 'YYYY-MM-DD'
   const normalizeDateStr = (dateVal) => {
     if (!dateVal) return '';
@@ -1151,26 +1179,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </nav>
 
         <div className="sidebar-bottom">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.8rem' }}>
-                A
-              </div>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin Panel</div>
-                <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
-              </div>
-            </div>
-            <button 
-              className="btn btn-sm btn-ghost" 
-              onClick={handleLogout}
-              title="Sign Out / Lock App"
-              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '5px 10px', gap: '4px', fontSize: '0.76rem' }}
-            >
-              <LogOut size={13} />
-              <span>Logout</span>
-            </button>
-          </div>
+          <button 
+            className="btn btn-sm btn-ghost" 
+            onClick={handleLogout}
+            title="Sign Out / Lock App"
+            style={{ width: '100%', justifyContent: 'center', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '9px 12px', gap: '6px', fontSize: '0.82rem', borderRadius: '8px' }}
+          >
+            <LogOut size={15} />
+            <span>Logout</span>
+          </button>
         </div>
       </aside>
 
@@ -1183,28 +1200,26 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               {activeTab === 'reports' && 'Salon Sales & Customer Reports'}
               {activeTab === 'services' && 'Manage Salon Services'}
               {activeTab === 'products' && 'Manage Retail Products'}
-              {activeTab === 'employees' && 'Staff & Team Management'}
+              {activeTab === 'employees' && 'Staff Management'}
             </h1>
             <p>
               {activeTab === 'billing' && 'Select services, assign working staff/stylist, and create instant bills.'}
               {activeTab === 'reports' && 'Filter and view your daily, monthly, or custom customer visits and revenue reports.'}
               {activeTab === 'services' && 'Add new salon services or edit existing prices.'}
               {activeTab === 'products' && 'Add new retail grooming products or update their pricing.'}
-              {activeTab === 'employees' && 'Manage salon team, Aadhaar cards, photos, contact details, and stylist profiles.'}
+              {activeTab === 'employees' && 'Manage salon staff, contact details, and service assignments.'}
             </p>
           </div>
           <div className="header-tools">
-            {activeTab !== 'billing' && (
-              <button 
-                className="btn btn-sm btn-gold" 
-                onClick={() => setActiveTab('billing')}
-                title="Go to New Entry"
-                style={{ padding: '8px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Home size={16} />
-                <span>Home</span>
-              </button>
-            )}
+            <button 
+              className={`btn btn-sm ${activeTab === 'billing' ? 'btn-ghost' : 'btn-gold'}`} 
+              onClick={() => setActiveTab('billing')}
+              title="Home / New Entry"
+              aria-label="Home"
+              style={{ width: '38px', height: '38px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Home size={18} />
+            </button>
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
@@ -1271,7 +1286,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       <option value="">-- Choose Working Staff --</option>
                       {employees.map(emp => (
                         <option key={emp.id} value={emp.name}>
-                          {emp.name} ({emp.role || 'Staff / Stylist'})
+                          {emp.name}
                         </option>
                       ))}
                     </select>
@@ -1280,7 +1295,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               </div>
 
               {/* Services Selector Card - Clean dropdown with search inside */}
-              <div className="glass-panel" style={{ marginTop: '20px' }}>
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  marginTop: '20px', 
+                  position: 'relative', 
+                  zIndex: isServiceDropdownOpen ? 99 : 5,
+                  overflow: 'visible' 
+                }}
+              >
                 <div className="panel-header">
                   <div className="panel-title">
                     <Scissors size={18} /> 2. Services Done
@@ -1290,7 +1313,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {/* Searchable Dropdown Component for Services */}
-                  <div className="dropdown-search-wrapper" style={{ position: 'relative' }}>
+                  <div className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
                     <div 
                       className="dropdown-trigger-box"
                       onClick={() => {
@@ -1310,12 +1333,9 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                         transition: 'border-color 0.2s'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Scissors size={16} color="var(--gold)" />
-                        <span style={{ color: selectedServices.length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
-                          Select or Search Services from Menu ({services.length} available)...
-                        </span>
-                      </div>
+                      <span style={{ color: selectedServices.length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
+                        Select Services
+                      </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--gold)', transform: isServiceDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
                         ▼
                       </span>
@@ -1330,7 +1350,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           top: 'calc(100% + 6px)',
                           left: 0,
                           right: 0,
-                          zIndex: 60,
+                          zIndex: 9999,
                           background: '#121620',
                           border: '1px solid var(--border-gold)',
                           borderRadius: '10px',
@@ -1424,18 +1444,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                             </div>
                           )}
                         </div>
-
-                        {/* Done Button to close dropdown */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                          <button 
-                            type="button" 
-                            className="btn btn-sm btn-outline-gold"
-                            onClick={() => { setIsServiceDropdownOpen(false); setServiceDropdownSearch(''); }}
-                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
-                          >
-                            Done Selecting
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -1471,7 +1479,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               </div>
 
               {/* Retail Products Card - Clean dropdown with search inside */}
-              <div className="glass-panel" style={{ marginTop: '20px' }}>
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  marginTop: '20px', 
+                  position: 'relative', 
+                  zIndex: isProductDropdownOpen ? 98 : 4,
+                  overflow: 'visible' 
+                }}
+              >
                 <div className="panel-header">
                   <div className="panel-title">
                     <ShoppingBag size={18} /> 3. Retail Products Purchased
@@ -1483,7 +1499,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {/* Searchable Dropdown Component for Retail Products */}
-                  <div className="dropdown-search-wrapper" style={{ position: 'relative' }}>
+                  <div className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
                     <div 
                       className="dropdown-trigger-box"
                       onClick={() => {
@@ -1503,12 +1519,9 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                         transition: 'border-color 0.2s'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <ShoppingBag size={16} color="#34d399" />
-                        <span style={{ color: Object.keys(selectedProducts).length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
-                          Select or Search Products from Menu ({products.length} available)...
-                        </span>
-                      </div>
+                      <span style={{ color: Object.keys(selectedProducts).length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
+                        Select Product
+                      </span>
                       <span style={{ fontSize: '0.8rem', color: '#34d399', transform: isProductDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
                         ▼
                       </span>
@@ -1523,7 +1536,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           top: 'calc(100% + 6px)',
                           left: 0,
                           right: 0,
-                          zIndex: 60,
+                          zIndex: 9999,
                           background: '#121620',
                           border: '1px solid rgba(16, 185, 129, 0.4)',
                           borderRadius: '10px',
@@ -1620,18 +1633,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                               No products found matching "{productDropdownSearch}".
                             </div>
                           )}
-                        </div>
-
-                        {/* Done Button to close dropdown */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                          <button 
-                            type="button" 
-                            className="btn btn-sm btn-outline-gold"
-                            onClick={() => { setIsProductDropdownOpen(false); setProductDropdownSearch(''); }}
-                            style={{ padding: '4px 12px', fontSize: '0.8rem', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
-                          >
-                            Done Selecting
-                          </button>
                         </div>
                       </div>
                     )}
@@ -1986,19 +1987,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   <thead>
                     <tr>
                       <th>Staff / Stylist</th>
-                      <th>Designation</th>
-                      <th style={{ textAlign: 'center' }}>Customers Served</th>
-                      <th style={{ textAlign: 'center' }}>Services Done</th>
-                      <th style={{ textAlign: 'center' }}>Retail Products Sold</th>
+                      <th style={{ textAlign: 'center' }}>Visits</th>
                       <th style={{ textAlign: 'right' }}>Total Revenue</th>
-                      <th style={{ textAlign: 'right' }}>Amount Paid</th>
-                      <th style={{ textAlign: 'right' }}>Pending Due</th>
                     </tr>
                   </thead>
                   <tbody>
                     {staffWorkReport.length === 0 ? (
                       <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-dim)' }}>
+                        <td colSpan="3" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-dim)' }}>
                           No staff members registered.
                         </td>
                       </tr>
@@ -2021,32 +2017,11 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                               </span>
                             )}
                           </td>
-                          <td>
-                            <span className="badge-tag-staff">{st.role}</span>
-                          </td>
                           <td style={{ textAlign: 'center' }}>
                             <strong style={{ fontSize: '0.95rem' }}>{st.totalCustomers}</strong> visits
                           </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className="badge-pill" style={{ fontSize: '0.75rem' }}>{st.totalServicesCount} services</span>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className="badge-pill" style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399', fontSize: '0.75rem' }}>
-                              {st.totalProductsCount} items
-                            </span>
-                          </td>
                           <td style={{ textAlign: 'right' }}>
                             <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>₹{st.totalRevenue.toLocaleString('en-IN')}</strong>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <span style={{ color: '#34d399', fontWeight: 600 }}>₹{st.totalPaid.toLocaleString('en-IN')}</span>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            {st.totalPending > 0 ? (
-                              <span style={{ color: '#ef4444', fontWeight: 700 }}>₹{st.totalPending.toLocaleString('en-IN')}</span>
-                            ) : (
-                              <span style={{ color: 'var(--text-dim)' }}>₹0</span>
-                            )}
                           </td>
                         </tr>
                       ))
@@ -2143,16 +2118,36 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                             </td>
                             <td>
                               {pending > 0 ? (
-                                <span style={{ 
-                                  color: '#ef4444', 
-                                  fontWeight: 700, 
-                                  background: 'rgba(239, 68, 68, 0.12)', 
-                                  padding: '2px 8px', 
-                                  borderRadius: '4px',
-                                  fontSize: '0.82rem'
-                                }}>
-                                  ₹{pending} Due
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ 
+                                    color: '#ef4444', 
+                                    fontWeight: 700, 
+                                    background: 'rgba(239, 68, 68, 0.12)', 
+                                    padding: '2px 8px', 
+                                    borderRadius: '4px',
+                                    fontSize: '0.82rem',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    ₹{pending} Due
+                                  </span>
+                                  <button
+                                    className="btn btn-sm btn-outline-gold"
+                                    onClick={() => handleClearDue(v)}
+                                    title="Clear remaining due & mark full amount paid"
+                                    style={{
+                                      padding: '2px 8px',
+                                      fontSize: '0.74rem',
+                                      lineHeight: '1.2',
+                                      borderRadius: '4px',
+                                      whiteSpace: 'nowrap',
+                                      border: '1px solid var(--gold)',
+                                      color: 'var(--gold)',
+                                      background: 'rgba(212, 175, 55, 0.1)'
+                                    }}
+                                  >
+                                    Clear Due
+                                  </button>
+                                </div>
                               ) : (
                                 <span style={{ color: '#34d399', fontSize: '0.8rem' }}>Settled ✓</span>
                               )}
@@ -2280,7 +2275,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
           <div className="glass-panel">
             <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
               <div className="panel-title">
-                <Users size={20} /> Team Members & Staff ({employees.length})
+                <Users size={20} /> Staff ({employees.length})
               </div>
               <button className="btn btn-sm btn-gold" onClick={() => setNewEmpModal(true)}>
                 <Plus size={14} /> Add New Staff
@@ -2318,7 +2313,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                         )}
                         <div className="emp-info">
                           <h4>{emp.name}</h4>
-                          <span className="emp-role-tag">{emp.role || 'Staff / Stylist'}</span>
                           {emp.phone && (
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                               📞 {emp.phone}
@@ -2345,14 +2339,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      <button 
-                        className="btn btn-sm btn-ghost" 
-                        onClick={() => setViewEmpModal(emp)}
-                        title="View Full ID Card"
-                      >
-                        View ID
-                      </button>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
                       <button 
                         className="btn btn-sm" 
                         style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
@@ -2595,26 +2582,15 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="input-field">
-                  <label>Mobile Number (10 Digits)</label>
-                  <input 
-                    type="tel" 
-                    placeholder="9876543210" 
-                    maxLength={10}
-                    value={newEmpPhone} 
-                    onChange={(e) => setNewEmpPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
-                  />
-                </div>
-                <div className="input-field">
-                  <label>Designation / Role</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Senior Hair Stylist" 
-                    value={newEmpRole} 
-                    onChange={(e) => setNewEmpRole(e.target.value)} 
-                  />
-                </div>
+              <div className="input-field">
+                <label>Mobile Number (10 Digits)</label>
+                <input 
+                  type="tel" 
+                  placeholder="9876543210" 
+                  maxLength={10}
+                  value={newEmpPhone} 
+                  onChange={(e) => setNewEmpPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                />
               </div>
 
               <div className="input-field">
@@ -2741,7 +2717,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
               <div>
                 <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '4px' }}>{viewEmpModal.name}</h3>
-                <span className="emp-role-tag">{viewEmpModal.role || 'Staff / Stylist'}</span>
               </div>
 
               <div style={{ width: '100%', background: 'rgba(10, 12, 16, 0.7)', borderRadius: '12px', border: '1px solid var(--border)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left', fontSize: '0.86rem' }}>
