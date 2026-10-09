@@ -195,6 +195,7 @@ export default function App() {
   const [visitDate, setVisitDate] = useState(todayStr);
   const [assignedEmployee, setAssignedEmployee] = useState('');
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [discount, setDiscount] = useState(0);
@@ -465,6 +466,8 @@ export default function App() {
     setCustomerName('');
     setCustomerPhone('');
     setAssignedEmployee('');
+    setServiceSearchTerm('');
+    setProductSearchTerm('');
     setSelectedServices([]);
     setSelectedProducts({});
     setDiscount(0);
@@ -948,14 +951,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
             className="btn-counter" 
-            onClick={handleLogout} 
-            title="Log Out"
-            style={{ color: '#f87171' }}
-          >
-            <LogOut size={16} />
-          </button>
-          <button 
-            className="btn-counter" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation"
           >
@@ -1019,14 +1014,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <div className="widget-label">Today's Revenue</div>
             <div className="widget-amount">₹{todayRevenue.toLocaleString('en-IN')}</div>
           </div>
-
-          <button 
-            className="btn btn-sm btn-ghost btn-block" 
-            onClick={handleLogout}
-            style={{ marginTop: '14px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.25)' }}
-          >
-            <LogOut size={15} /> Sign Out
-          </button>
         </div>
       </aside>
 
@@ -1065,14 +1052,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <button 
-              className="btn btn-sm btn-ghost" 
-              onClick={handleLogout}
-              title="Sign Out"
-              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
-            >
-              <LogOut size={15} />
-            </button>
           </div>
         </header>
 
@@ -1345,34 +1324,202 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     {Object.values(selectedProducts).reduce((a, b) => a + b, 0)} Items
                   </span>
                 </div>
-                <div className="product-picker-list">
-                  {products.map(p => {
-                    const qty = selectedProducts[p.id] || 0;
-                    return (
-                      <div key={p.id} className="product-row">
-                        <div className="p-details">
-                          <div className="p-name">{p.name}</div>
-                          <div className="p-sub">₹{p.price}</div>
-                        </div>
-                        <div className="qty-controls">
-                          <button 
-                            className="btn-counter" 
-                            onClick={() => adjustProductQty(p.id, -1)}
-                            disabled={qty === 0}
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="qty-val">{qty}</span>
-                          <button 
-                            className="btn-counter" 
-                            onClick={() => adjustProductQty(p.id, 1)}
-                          >
-                            <Plus size={14} />
-                          </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Unified Live Search & Dropdown Box */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ position: 'relative' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '10px', 
+                          background: 'rgba(10, 12, 16, 0.85)', 
+                          padding: '10px 14px', 
+                          borderRadius: '8px', 
+                          border: '1px solid var(--border)' 
+                        }}>
+                          <Search size={16} color="#34d399" />
+                          <input 
+                            type="text" 
+                            placeholder="Type product name to search (e.g. Wax, Serum, Shampoo)..." 
+                            value={productSearchTerm}
+                            onChange={(e) => setProductSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const filtered = products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()));
+                                if (filtered.length > 0) {
+                                  const targetP = filtered[0];
+                                  adjustProductQty(targetP.id, 1);
+                                  setProductSearchTerm('');
+                                }
+                              }
+                            }}
+                            style={{ background: 'transparent', border: 'none', padding: 0, width: '100%', color: '#fff', fontSize: '0.92rem', outline: 'none' }}
+                          />
+                          {productSearchTerm && (
+                            <button 
+                              type="button"
+                              onClick={() => setProductSearchTerm('')} 
+                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-outline-gold"
+                        onClick={() => setNewPrdModal(true)}
+                        style={{ whiteSpace: 'nowrap', padding: '10px 14px', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+                      >
+                        <Plus size={14} /> New Product
+                      </button>
+                    </div>
+
+                    {/* Instant Search Results Panel */}
+                    {productSearchTerm.trim() && (
+                      <div style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        left: 0, 
+                        right: 0, 
+                        zIndex: 50, 
+                        marginTop: '4px',
+                        background: '#131822', 
+                        border: '1px solid rgba(16, 185, 129, 0.4)', 
+                        borderRadius: '10px', 
+                        maxHeight: '220px', 
+                        overflowY: 'auto', 
+                        padding: '6px', 
+                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7)',
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '4px' 
+                      }}>
+                        {products
+                          .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                          .map(p => {
+                            const qty = selectedProducts[p.id] || 0;
+                            return (
+                              <div 
+                                key={p.id} 
+                                onClick={() => {
+                                  adjustProductQty(p.id, 1);
+                                  setProductSearchTerm('');
+                                }}
+                                style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  padding: '9px 12px', 
+                                  borderRadius: '6px', 
+                                  background: qty > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.9rem',
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.18)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = qty > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)';
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ color: '#34d399', fontWeight: 700 }}>₹{p.price}</span>
+                                  {qty > 0 ? (
+                                    <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>Added ({qty}) ✓</span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#000', background: '#34d399', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>+ Add</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        {products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.84rem' }}>
+                            No product matching "{productSearchTerm}". Click "+ New Product" to create it.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown Quick Picker for Users Who Prefer Dropdown */}
+                  <div className="input-field" style={{ margin: 0 }}>
+                    <select 
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        adjustProductQty(val, 1);
+                      }}
+                    >
+                      <option value="">-- Or Select from All Products Dropdown --</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — ₹{p.price} {selectedProducts[p.id] ? `(Qty: ${selectedProducts[p.id]})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Selected Products Tags / Pills with Qty controls */}
+                  <div>
+                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                      Selected Retail Products ({Object.values(selectedProducts).reduce((a, b) => a + b, 0)}):
+                    </label>
+                    {Object.entries(selectedProducts).length === 0 ? (
+                      <div style={{ padding: '12px', background: 'rgba(10, 12, 16, 0.4)', borderRadius: '8px', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                        No retail products added. Choose a product from the search or dropdown above if customer purchased any.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {Object.entries(selectedProducts).map(([pid, qty]) => {
+                          const prod = products.find(p => p.id === pid);
+                          if (!prod) return null;
+                          return (
+                            <div key={pid} className="product-pill-tag">
+                              <span>{prod.name}</span>
+                              <span style={{ color: '#fff' }}>₹{prod.price * qty}</span>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
+                                <button 
+                                  type="button" 
+                                  className="pill-qty-btn"
+                                  onClick={() => adjustProductQty(pid, -1)}
+                                  title="Decrease quantity"
+                                >
+                                  -
+                                </button>
+                                <span style={{ color: '#fff', fontSize: '0.8rem', padding: '0 2px' }}>{qty}</span>
+                                <button 
+                                  type="button" 
+                                  className="pill-qty-btn"
+                                  onClick={() => adjustProductQty(pid, 1)}
+                                  title="Increase quantity"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <button 
+                                type="button" 
+                                className="remove-btn"
+                                onClick={() => adjustProductQty(pid, -qty)}
+                                title="Remove product"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
