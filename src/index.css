@@ -858,10 +858,23 @@ body {
 @media (max-width: 768px) {
   .app-container {
     flex-direction: column;
+    padding-bottom: 72px; /* space for mobile bottom navigation */
   }
 
   .mobile-header {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(14, 18, 26, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
   }
 
   /* Slide-in Drawer Sidebar */
@@ -869,11 +882,11 @@ body {
     position: fixed;
     top: 0;
     left: -100%;
-    width: 280px;
+    width: 285px;
     height: 100vh;
     z-index: 1000;
-    transition: left 0.3s ease-in-out;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.7);
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.85);
   }
 
   .sidebar.open {
@@ -881,18 +894,75 @@ body {
   }
 
   .main-wrapper {
-    padding: 12px;
+    padding: 12px 10px 24px;
     max-width: 100%;
   }
 
+  /* Compact modern mobile header info */
   .header-bar {
-    position: static;
-    background: transparent;
-    border-bottom: none;
-    padding: 0;
-    margin-bottom: 16px;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(18, 22, 31, 0.65);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 14px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .page-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .page-info h1 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .page-info p {
+    display: none; /* Hide long desktop subtitles on mobile to save valuable vertical screen space */
+  }
+
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .badge-date {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    gap: 4px;
+  }
+
+  .badge-date svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .glass-panel {
+    padding: 16px 14px;
+    border-radius: 14px;
+    margin-top: 14px !important;
+  }
+
+  .panel-header {
+    margin-bottom: 12px;
+  }
+
+  .panel-title {
+    font-size: 0.96rem;
   }
 
   .form-grid-2 {
@@ -900,18 +970,44 @@ body {
     gap: 12px;
   }
 
+  .input-field label {
+    font-size: 0.74rem;
+  }
+
+  .input-field input, .input-field select {
+    padding: 11px 12px;
+    font-size: 0.95rem;
+    border-radius: 8px;
+  }
+
   .filter-bar-wrap {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
+    gap: 12px;
+    padding: 12px 14px;
   }
 
   .filter-pills {
-    flex-wrap: wrap;
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+
+  .filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pill-btn {
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 0.78rem;
   }
 
   .custom-date-container {
     flex-wrap: wrap;
+    gap: 6px;
   }
 
   .billing-form {
@@ -919,37 +1015,29 @@ body {
     width: 100%;
   }
 
-  .service-selector-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px;
-  }
-
-  .service-card {
-    height: 90px;
-    padding: 10px 12px;
-  }
-
-  .service-card .srv-name {
-    font-size: 0.86rem;
-  }
-
   .kpi-row {
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
+    margin-bottom: 16px;
   }
 
   .kpi-box {
-    padding: 14px;
+    padding: 12px;
+  }
+
+  .kpi-ico {
+    width: 40px;
+    height: 40px;
   }
 
   .kpi-text h3 {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
   }
 
   .modal-card {
     width: 95%;
-    padding: 18px;
-    max-height: 90vh;
+    padding: 16px;
+    max-height: 88vh;
     overflow-y: auto;
   }
 
@@ -966,9 +1054,57 @@ body {
     display: none !important;
   }
 
-  .badge-date {
+  /* Mobile App Bottom Navigation Bar */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: rgba(14, 18, 26, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(212, 175, 55, 0.25);
+    z-index: 998;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 4px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.7);
+  }
+
+  .mobile-tab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
     padding: 6px 10px;
-    font-size: 0.78rem;
+    border-radius: 8px;
+    cursor: pointer;
+    flex: 1;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-tab-btn svg {
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-tab-btn.active {
+    color: var(--gold);
+  }
+
+  .mobile-tab-btn.active svg {
+    transform: scale(1.15);
+  }
+
+  .mobile-tab-btn:hover {
+    color: #fff;
   }
 }
 
@@ -1008,30 +1144,32 @@ body {
   }
 
   .main-wrapper {
-    padding: 12px 10px;
+    padding: 10px 8px 30px;
   }
 
   .glass-panel {
-    padding: 16px 14px;
+    padding: 14px 12px;
     border-radius: 12px;
   }
 
   .page-info h1 {
-    font-size: 1.25rem;
-  }
-
-  .page-info p {
-    font-size: 0.78rem;
+    font-size: 0.98rem;
   }
 
   .header-bar {
-    gap: 8px;
-    margin-bottom: 14px;
+    padding: 6px 10px;
+    gap: 6px;
+    margin-bottom: 12px;
   }
 
   .login-card {
     padding: 20px 14px;
   }
+}
+
+/* Desktop default hiding of mobile bottom nav */
+.mobile-bottom-nav {
+  display: none;
 }
 
 /* ========================================================

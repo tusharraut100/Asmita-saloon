@@ -951,8 +951,17 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
             className="btn-counter" 
+            onClick={handleLogout} 
+            title="Log Out / Lock Screen"
+            style={{ color: '#f87171', width: '36px', height: '36px' }}
+          >
+            <LogOut size={16} />
+          </button>
+          <button 
+            className="btn-counter" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation"
+            style={{ width: '36px', height: '36px' }}
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -2451,6 +2460,45 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Quick Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        <button 
+          className={`mobile-tab-btn ${activeTab === 'billing' ? 'active' : ''}`}
+          onClick={() => setActiveTab('billing')}
+        >
+          <PlusCircle size={20} />
+          <span>New Entry</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          <FileText size={20} />
+          <span>Reports</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeTab === 'services' ? 'active' : ''}`}
+          onClick={() => setActiveTab('services')}
+        >
+          <Scissors size={20} />
+          <span>Services</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('products')}
+        >
+          <ShoppingBag size={20} />
+          <span>Products</span>
+        </button>
+        <button 
+          className={`mobile-tab-btn ${activeTab === 'employees' ? 'active' : ''}`}
+          onClick={() => setActiveTab('employees')}
+        >
+          <Users size={20} />
+          <span>Staff</span>
+        </button>
+      </nav>
     </div>
   );
 }
