@@ -255,22 +255,38 @@ export default function App() {
           .order('created_at', { ascending: false });
 
         if (!vErr && cloudVisits && cloudVisits.length > 0) {
-          const mappedVisits = cloudVisits.map(v => ({
-            id: v.id,
-            customerName: v.customer_name,
-            customerPhone: v.customer_phone,
-            date: v.date,
-            time: v.time,
-            services: v.services || [],
-            products: v.products || [],
-            servicesTotal: Number(v.services_total) || 0,
-            productsTotal: Number(v.products_total) || 0,
-            discount: Number(v.discount) || 0,
-            grandTotal: Number(v.grand_total) || 0,
-            paymentMethod: v.payment_method || 'Cash',
-            employeeName: v.employee_name || ''
-          }));
-          setVisits(mappedVisits);
+          const mappedVisits = cloudVisits.map(v => {
+            const gTotal = Number(v.grand_total) || 0;
+            const pAmount = v.paid_amount !== undefined && v.paid_amount !== null ? Number(v.paid_amount) : gTotal;
+            const pendAmount = v.pending_amount !== undefined && v.pending_amount !== null ? Number(v.pending_amount) : Math.max(0, gTotal - pAmount);
+            return {
+              id: v.id,
+              customerName: v.customer_name || 'Walk-in Customer',
+              customerPhone: v.customer_phone || '',
+              date: v.date,
+              time: v.time || '',
+              services: v.services || [],
+              products: v.products || [],
+              servicesTotal: Number(v.services_total) || 0,
+              productsTotal: Number(v.products_total) || 0,
+              discount: Number(v.discount) || 0,
+              grandTotal: gTotal,
+              paidAmount: pAmount,
+              pendingAmount: pendAmount,
+              paymentMethod: v.payment_method || 'Cash',
+              employeeName: v.employee_name || ''
+            };
+          });
+
+          // Merge cloud visits with any locally cached visits so no visits are ever lost
+          setVisits(prev => {
+            const visitMap = new Map();
+            // Start with locally stored visits
+            prev.forEach(item => visitMap.set(item.id, item));
+            // Layer and update with cloud visits
+            mappedVisits.forEach(item => visitMap.set(item.id, item));
+            return Array.from(visitMap.values()).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+          });
         }
 
         const { data: cloudServices } = await supabase.from('salon_services').select('*');
@@ -454,7 +470,7 @@ export default function App() {
 
     // Sync to Supabase in background
     if (isSupabaseConfigured && supabase) {
-      supabase.from('salon_visits').insert([{
+      const fullPayload = {
         id: newVisit.id,
         customer_name: newVisit.customerName,
         customer_phone: newVisit.customerPhone,
@@ -470,8 +486,34 @@ export default function App() {
         payment_method: newVisit.paymentMethod,
         paid_amount: newVisit.paidAmount,
         pending_amount: newVisit.pendingAmount
-      }]).then(({ error }) => {
-        if (error) console.error('Error uploading to Supabase:', error);
+      };
+
+      supabase.from('salon_visits').insert([fullPayload]).then(({ error }) => {
+        if (error) {
+          console.warn('Full Supabase insert error, falling back to base columns:', error.message);
+          // Fallback to base columns if new schema columns have not yet been migrated in Supabase SQL editor
+          const basePayload = {
+            id: newVisit.id,
+            customer_name: newVisit.customerName,
+            customer_phone: newVisit.customerPhone,
+            date: newVisit.date,
+            time: newVisit.time,
+            services: newVisit.services,
+            products: newVisit.products,
+            services_total: newVisit.servicesTotal,
+            products_total: newVisit.productsTotal,
+            discount: newVisit.discount,
+            grand_total: newVisit.grandTotal,
+            payment_method: newVisit.paymentMethod
+          };
+          supabase.from('salon_visits').insert([basePayload]).then(({ error: fallbackErr }) => {
+            if (fallbackErr) {
+              console.error('Fallback Supabase insert error:', fallbackErr);
+            } else {
+              console.log('Saved entry to Supabase using base columns.');
+            }
+          });
+        }
       });
     }
 

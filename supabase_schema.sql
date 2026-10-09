@@ -10,15 +10,23 @@ CREATE TABLE IF NOT EXISTS salon_visits (
   customer_phone TEXT,
   date DATE NOT NULL,
   time TEXT,
+  employee_name TEXT,
   services JSONB DEFAULT '[]'::jsonb,
   products JSONB DEFAULT '[]'::jsonb,
   services_total NUMERIC DEFAULT 0,
   products_total NUMERIC DEFAULT 0,
   discount NUMERIC DEFAULT 0,
   grand_total NUMERIC NOT NULL,
+  paid_amount NUMERIC DEFAULT 0,
+  pending_amount NUMERIC DEFAULT 0,
   payment_method TEXT DEFAULT 'Cash',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- If you ALREADY have the salon_visits table created, run these 3 lines to add the new columns:
+ALTER TABLE salon_visits ADD COLUMN IF NOT EXISTS employee_name TEXT;
+ALTER TABLE salon_visits ADD COLUMN IF NOT EXISTS paid_amount NUMERIC DEFAULT 0;
+ALTER TABLE salon_visits ADD COLUMN IF NOT EXISTS pending_amount NUMERIC DEFAULT 0;
 
 -- 2. Create Services Catalog Table
 CREATE TABLE IF NOT EXISTS salon_services (
