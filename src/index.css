@@ -262,21 +262,26 @@ body {
   width: 100%;
 }
 
-.billing-summary-panel {
-  width: 100%;
+.billing-form {
   min-width: 0;
+  width: 100%;
 }
 
 .form-grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .input-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .input-field label {
@@ -284,6 +289,9 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .input-field input, .input-field select {
@@ -296,6 +304,23 @@ body {
   font-size: 0.92rem;
   outline: none;
   transition: 0.2s;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.input-field select {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.input-field input[type="date"] {
+  max-width: 100%;
+  min-width: 0;
+  color-scheme: dark;
 }
 
 .input-field input:focus, .input-field select:focus {
@@ -958,6 +983,10 @@ body {
     padding: 16px 14px;
     border-radius: 14px;
     margin-top: 14px !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .panel-header {
@@ -969,8 +998,18 @@ body {
   }
 
   .form-grid-2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: 100%;
     gap: 12px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .input-field {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .input-field label {
@@ -981,6 +1020,10 @@ body {
     padding: 11px 12px;
     font-size: 0.95rem;
     border-radius: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .filter-bar-wrap {
