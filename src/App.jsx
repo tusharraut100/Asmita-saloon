@@ -194,18 +194,24 @@ export default function App() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [visitDate, setVisitDate] = useState(todayStr);
   const [assignedEmployee, setAssignedEmployee] = useState('');
-  const [serviceSearchTerm, setServiceSearchTerm] = useState('');
-  const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paidAmountInput, setPaidAmountInput] = useState(''); // Custom paid amount if partial/pending
+
+  // Search inside Dropdown states for Services & Products
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [serviceDropdownSearch, setServiceDropdownSearch] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [productDropdownSearch, setProductDropdownSearch] = useState('');
 
   // Filter State
   const [filterRange, setFilterRange] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [staffFilter, setStaffFilter] = useState('all'); // Filter visits by staff
 
   // Modals
   const [activeReceipt, setActiveReceipt] = useState(null);
@@ -344,10 +350,15 @@ export default function App() {
   }, 0);
   const grandTotal = Math.max(0, (servicesTotal + productsTotal) - (Number(discount) || 0));
 
+  // Paid and Pending calculations
+  // If paidAmountInput is empty string, default paid amount is grandTotal
+  const effectivePaidAmount = paidAmountInput === '' ? grandTotal : Math.max(0, Number(paidAmountInput) || 0);
+  const pendingAmount = Math.max(0, grandTotal - effectivePaidAmount);
+
   // Today Total in sidebar
   const todayRevenue = visits
     .filter(v => v.date === todayStr)
-    .reduce((sum, v) => sum + v.grandTotal, 0);
+    .reduce((sum, v) => sum + (v.paidAmount !== undefined ? v.paidAmount : v.grandTotal), 0);
 
   // Toggle Service
   const toggleService = (srv) => {
@@ -432,6 +443,8 @@ export default function App() {
       productsTotal,
       discount: Number(discount) || 0,
       grandTotal,
+      paidAmount: effectivePaidAmount,
+      pendingAmount: pendingAmount,
       paymentMethod
     };
 
@@ -453,24 +466,27 @@ export default function App() {
         products_total: newVisit.productsTotal,
         discount: newVisit.discount,
         grand_total: newVisit.grandTotal,
-        payment_method: newVisit.paymentMethod
+        payment_method: newVisit.paymentMethod,
+        paid_amount: newVisit.paidAmount,
+        pending_amount: newVisit.pendingAmount
       }]).then(({ error }) => {
         if (error) console.error('Error uploading to Supabase:', error);
       });
     }
 
     // Success Alert after adding customer
-    alert(`✅ Customer Visit Successfully Added!\n\nCustomer: ${newVisit.customerName}\nStylist/Staff: ${newVisit.employeeName || 'Unassigned'}\nTotal Bill: ₹${newVisit.grandTotal}\nPayment: ${newVisit.paymentMethod}`);
+    alert(`✅ Customer Visit Successfully Added!\n\nCustomer: ${newVisit.customerName}\nStylist/Staff: ${newVisit.employeeName || 'Unassigned'}\nTotal Bill: ₹${newVisit.grandTotal}\nPaid Amount: ₹${newVisit.paidAmount}\nPending Amount: ₹${newVisit.pendingAmount}\nPayment Method: ${newVisit.paymentMethod}`);
 
     // Reset Form
     setCustomerName('');
     setCustomerPhone('');
     setAssignedEmployee('');
-    setServiceSearchTerm('');
-    setProductSearchTerm('');
     setSelectedServices([]);
     setSelectedProducts({});
     setDiscount(0);
+    setPaidAmountInput('');
+    setIsServiceDropdownOpen(false);
+    setIsProductDropdownOpen(false);
     setActiveReceipt(newVisit);
   };
 
@@ -492,13 +508,13 @@ export default function App() {
 📱 *Phone:* ${visit.customerPhone}
 📅 *Date:* ${visit.date} ${visit.time}
 🧾 *Invoice #:* ${visit.id}
-${visit.employeeName ? `✂️ *Stylist / Served By:* ${visit.employeeName}\n` : ''}
-💇 *Services & Products:*
+${visit.employeeName ? `✂️ *Stylist / Served By:* ${visit.employeeName}\n` : ''}💇 *Services & Products:*
 ${itemsText}
 ━━━━━━━━━━━━━━━━━━━━
 💵 *Subtotal:* ₹${visit.servicesTotal + visit.productsTotal}
-${visit.discount > 0 ? `🎁 *Discount Applied:* -₹${visit.discount}\n` : ''}💰 *Total Paid:* ₹${visit.grandTotal} (${visit.paymentMethod})
-━━━━━━━━━━━━━━━━━━━━
+${visit.discount > 0 ? `🎁 *Discount Applied:* -₹${visit.discount}\n` : ''}💰 *Grand Total:* ₹${visit.grandTotal}
+💳 *Paid Amount:* ₹${visit.paidAmount !== undefined ? visit.paidAmount : visit.grandTotal} (${visit.paymentMethod})
+${(visit.pendingAmount > 0) ? `⚠️ *Pending Account Balance:* ₹${visit.pendingAmount}\n` : ''}━━━━━━━━━━━━━━━━━━━━
 Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️`;
 
     const encodedMessage = encodeURIComponent(message);
@@ -702,6 +718,11 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
     if (!dateMatch) return false;
 
+    // Staff Filter
+    if (staffFilter !== 'all') {
+      if ((v.employeeName || '') !== staffFilter) return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -715,20 +736,50 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
   // Analytics Metrics
   const metricRevenue = filteredVisits.reduce((acc, v) => acc + v.grandTotal, 0);
+  const metricPaidRevenue = filteredVisits.reduce((acc, v) => acc + (v.paidAmount !== undefined ? v.paidAmount : v.grandTotal), 0);
+  const metricPendingTotal = filteredVisits.reduce((acc, v) => acc + (v.pendingAmount || 0), 0);
   const metricServicesRev = filteredVisits.reduce((acc, v) => acc + v.servicesTotal, 0);
   const metricProductsRev = filteredVisits.reduce((acc, v) => acc + v.productsTotal, 0);
   const metricDiscountTotal = filteredVisits.reduce((acc, v) => acc + (v.discount || 0), 0);
   const metricServicesCount = filteredVisits.reduce((acc, v) => acc + (v.services?.length || 0), 0);
   const metricProductsCount = filteredVisits.reduce((acc, v) => acc + (v.products?.reduce((s, p) => s + p.qty, 0) || 0), 0);
 
+  // Staff Work Report Aggregation
+  // Calculate performance metrics for all staff members based on filteredVisits
+  const staffWorkReport = employees.map(emp => {
+    const empVisits = filteredVisits.filter(v => v.employeeName === emp.name);
+    const totalCustomers = empVisits.length;
+    const totalRevenue = empVisits.reduce((sum, v) => sum + v.grandTotal, 0);
+    const totalPaid = empVisits.reduce((sum, v) => sum + (v.paidAmount !== undefined ? v.paidAmount : v.grandTotal), 0);
+    const totalPending = empVisits.reduce((sum, v) => sum + (v.pendingAmount || 0), 0);
+    const totalServicesCount = empVisits.reduce((sum, v) => sum + (v.services?.length || 0), 0);
+    const totalProductsCount = empVisits.reduce((sum, v) => sum + (v.products?.reduce((s, p) => s + p.qty, 0) || 0), 0);
+
+    return {
+      id: emp.id,
+      name: emp.name,
+      role: emp.role || 'Staff',
+      phone: emp.phone,
+      totalCustomers,
+      totalRevenue,
+      totalPaid,
+      totalPending,
+      totalServicesCount,
+      totalProductsCount,
+      avgTicket: totalCustomers > 0 ? Math.round(totalRevenue / totalCustomers) : 0
+    };
+  }).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
   // CSV Export
   const handleExportCSV = () => {
     if (filteredVisits.length === 0) return alert('No records to export');
-    let csv = "Invoice,Date,Time,Customer,Phone,Stylist_Staff,Services,Products,Payment,Discount,Total\n";
+    let csv = "Invoice,Date,Time,Customer,Phone,Stylist_Staff,Services,Products,Payment,Discount,Total,Paid_Amount,Pending_Amount\n";
     filteredVisits.forEach(v => {
       const srvs = v.services.map(s => s.name).join(' | ');
       const prds = v.products.map(p => `${p.name} (x${p.qty})`).join(' | ');
-      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${v.employeeName || 'Unassigned'}","${srvs}","${prds}","${v.paymentMethod}","${v.discount}","${v.grandTotal}"\n`;
+      const paid = v.paidAmount !== undefined ? v.paidAmount : v.grandTotal;
+      const pending = v.pendingAmount || 0;
+      csv += `"${v.id}","${v.date}","${v.time}","${v.customerName}","${v.customerPhone}","${v.employeeName || 'Unassigned'}","${srvs}","${prds}","${v.paymentMethod}","${v.discount}","${v.grandTotal}","${paid}","${pending}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1174,7 +1225,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 </div>
               </div>
 
-              {/* Services Selector Card - Clean dropdown & search like Employee selector */}
+              {/* Services Selector Card - Clean dropdown with search inside */}
               <div className="glass-panel" style={{ marginTop: '20px' }}>
                 <div className="panel-header">
                   <div className="panel-title">
@@ -1184,156 +1235,153 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {/* Unified Live Search & Dropdown Box */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', alignItems: 'center' }}>
-                      <div style={{ position: 'relative' }}>
+                  {/* Searchable Dropdown Component for Services */}
+                  <div className="dropdown-search-wrapper" style={{ position: 'relative' }}>
+                    <div 
+                      className="dropdown-trigger-box"
+                      onClick={() => {
+                        setIsServiceDropdownOpen(prev => !prev);
+                        setIsProductDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        background: 'rgba(10, 12, 16, 0.85)',
+                        border: isServiceDropdownOpen ? '1px solid var(--gold)' : '1px solid var(--border)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        transition: 'border-color 0.2s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Scissors size={16} color="var(--gold)" />
+                        <span style={{ color: selectedServices.length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
+                          Select or Search Services from Menu ({services.length} available)...
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--gold)', transform: isServiceDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
+                        ▼
+                      </span>
+                    </div>
+
+                    {/* Dropdown Menu with Search Inside */}
+                    {isServiceDropdownOpen && (
+                      <div 
+                        className="dropdown-menu-popover"
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 6px)',
+                          left: 0,
+                          right: 0,
+                          zIndex: 60,
+                          background: '#121620',
+                          border: '1px solid var(--border-gold)',
+                          borderRadius: '10px',
+                          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.8)',
+                          padding: '10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}
+                      >
+                        {/* Search input INSIDE dropdown */}
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '10px', 
-                          background: 'rgba(10, 12, 16, 0.85)', 
-                          padding: '10px 14px', 
-                          borderRadius: '8px', 
+                          gap: '8px', 
+                          background: 'rgba(255, 255, 255, 0.06)', 
+                          padding: '8px 12px', 
+                          borderRadius: '6px', 
                           border: '1px solid var(--border)' 
                         }}>
-                          <Search size={16} color="var(--gold)" />
+                          <Search size={15} color="var(--gold)" />
                           <input 
                             type="text" 
-                            placeholder="Type service name to search (e.g. Haircut, Beard, Facial)..." 
-                            value={serviceSearchTerm}
-                            onChange={(e) => setServiceSearchTerm(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const filtered = services.filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()));
-                                if (filtered.length > 0) {
-                                  const targetSrv = filtered[0];
-                                  if (!selectedServices.some(sel => sel.id === targetSrv.id)) {
-                                    setSelectedServices([...selectedServices, targetSrv]);
-                                  }
-                                  setServiceSearchTerm('');
-                                }
-                              }
+                            placeholder="Search service name (Haircut, Beard, Facial...)" 
+                            value={serviceDropdownSearch}
+                            onChange={(e) => setServiceDropdownSearch(e.target.value)}
+                            autoFocus
+                            style={{ 
+                              background: 'transparent', 
+                              border: 'none', 
+                              outline: 'none', 
+                              color: '#fff', 
+                              fontSize: '0.88rem', 
+                              width: '100%' 
                             }}
-                            style={{ background: 'transparent', border: 'none', padding: 0, width: '100%', color: '#fff', fontSize: '0.92rem', outline: 'none' }}
                           />
-                          {serviceSearchTerm && (
+                          {serviceDropdownSearch && (
                             <button 
-                              type="button"
-                              onClick={() => setServiceSearchTerm('')} 
-                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                              type="button" 
+                              onClick={() => setServiceDropdownSearch('')}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                             >
                               ✕
                             </button>
                           )}
                         </div>
-                      </div>
 
-                      <button 
-                        type="button" 
-                        className="btn btn-sm btn-outline-gold"
-                        onClick={() => setNewSrvModal(true)}
-                        style={{ whiteSpace: 'nowrap', padding: '10px 14px' }}
-                      >
-                        <Plus size={14} /> New Service
-                      </button>
-                    </div>
-
-                    {/* Instant Search Results Panel */}
-                    {serviceSearchTerm.trim() && (
-                      <div style={{ 
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        zIndex: 50,
-                        marginTop: '4px',
-                        background: '#131822', 
-                        border: '1px solid var(--border-gold)', 
-                        borderRadius: '10px', 
-                        maxHeight: '220px', 
-                        overflowY: 'auto', 
-                        padding: '6px', 
-                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7)',
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '4px' 
-                      }}>
-                        {services
-                          .filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()))
-                          .map(s => {
-                            const isAlready = selectedServices.some(sel => sel.id === s.id);
-                            return (
-                              <div 
-                                key={s.id} 
-                                onClick={() => {
-                                  if (!isAlready) {
-                                    setSelectedServices([...selectedServices, s]);
-                                  }
-                                  setServiceSearchTerm('');
-                                }}
-                                style={{ 
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center', 
-                                  padding: '9px 12px', 
-                                  borderRadius: '6px', 
-                                  background: isAlready ? 'rgba(212, 175, 55, 0.12)' : 'rgba(255, 255, 255, 0.04)', 
-                                  cursor: isAlready ? 'default' : 'pointer',
-                                  fontSize: '0.9rem',
-                                  transition: 'background 0.15s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isAlready) e.currentTarget.style.background = 'rgba(212, 175, 55, 0.18)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isAlready) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                                }}
-                              >
-                                <span style={{ fontWeight: 600 }}>{s.name}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: 'var(--gold)', fontWeight: 700 }}>₹{s.price}</span>
-                                  {isAlready ? (
-                                    <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>Added ✓</span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#000', background: 'var(--gold)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>+ Add</span>
-                                  )}
+                        {/* Filtered Services List */}
+                        <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {services
+                            .filter(s => s.name.toLowerCase().includes(serviceDropdownSearch.toLowerCase()))
+                            .map(s => {
+                              const isAdded = selectedServices.some(sel => sel.id === s.id);
+                              return (
+                                <div 
+                                  key={s.id}
+                                  onClick={() => {
+                                    toggleService(s);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    background: isAdded ? 'rgba(212, 175, 55, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                    cursor: 'pointer',
+                                    border: isAdded ? '1px solid rgba(212, 175, 55, 0.3)' : '1px solid transparent',
+                                    transition: 'background 0.15s'
+                                  }}
+                                >
+                                  <div>
+                                    <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{s.name}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: 'var(--gold)', fontWeight: 700 }}>₹{s.price}</span>
+                                    {isAdded ? (
+                                      <span style={{ fontSize: '0.75rem', background: '#34d399', color: '#000', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>✓ Added</span>
+                                    ) : (
+                                      <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>+ Add</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        {services.filter(s => s.name.toLowerCase().includes(serviceSearchTerm.toLowerCase())).length === 0 && (
-                          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.84rem' }}>
-                            No service matching "{serviceSearchTerm}". Click "+ New Service" to create it.
-                          </div>
-                        )}
+                              );
+                            })}
+                          {services.filter(s => s.name.toLowerCase().includes(serviceDropdownSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                              No services found matching "{serviceDropdownSearch}".
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Done Button to close dropdown */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-outline-gold"
+                            onClick={() => setIsServiceDropdownOpen(false)}
+                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                          >
+                            Done Selecting
+                          </button>
+                        </div>
                       </div>
                     )}
-                  </div>
-
-                  {/* Dropdown Quick Picker for Users Who Prefer Dropdown */}
-                  <div className="input-field" style={{ margin: 0 }}>
-                    <select 
-                      value=""
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
-                        const srv = services.find(s => s.id === val);
-                        if (srv && !selectedServices.some(s => s.id === srv.id)) {
-                          setSelectedServices([...selectedServices, srv]);
-                        }
-                      }}
-                    >
-                      <option value="">-- Or Select from All Services Dropdown --</option>
-                      {services
-                        .filter(s => !selectedServices.some(sel => sel.id === s.id))
-                        .map(srv => (
-                          <option key={srv.id} value={srv.id}>
-                            {srv.name} — ₹{srv.price}
-                          </option>
-                        ))}
-                    </select>
                   </div>
 
                   {/* Selected Services Tags / List */}
@@ -1343,7 +1391,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     </label>
                     {selectedServices.length === 0 ? (
                       <div style={{ padding: '12px', background: 'rgba(10, 12, 16, 0.4)', borderRadius: '8px', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                        No services selected yet. Choose a service from the dropdown above.
+                        No services selected yet. Click the dropdown menu above to select services.
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -1366,7 +1414,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 </div>
               </div>
 
-              {/* Retail Products Card */}
+              {/* Retail Products Card - Clean dropdown with search inside */}
               <div className="glass-panel" style={{ marginTop: '20px' }}>
                 <div className="panel-header">
                   <div className="panel-title">
@@ -1378,147 +1426,157 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {/* Unified Live Search & Dropdown Box */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', alignItems: 'center' }}>
-                      <div style={{ position: 'relative' }}>
+                  {/* Searchable Dropdown Component for Retail Products */}
+                  <div className="dropdown-search-wrapper" style={{ position: 'relative' }}>
+                    <div 
+                      className="dropdown-trigger-box"
+                      onClick={() => {
+                        setIsProductDropdownOpen(prev => !prev);
+                        setIsServiceDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        background: 'rgba(10, 12, 16, 0.85)',
+                        border: isProductDropdownOpen ? '1px solid #34d399' : '1px solid var(--border)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        transition: 'border-color 0.2s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <ShoppingBag size={16} color="#34d399" />
+                        <span style={{ color: Object.keys(selectedProducts).length > 0 ? '#fff' : 'var(--text-dim)', fontSize: '0.92rem' }}>
+                          Select or Search Products from Menu ({products.length} available)...
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: '#34d399', transform: isProductDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
+                        ▼
+                      </span>
+                    </div>
+
+                    {/* Dropdown Menu with Search Inside */}
+                    {isProductDropdownOpen && (
+                      <div 
+                        className="dropdown-menu-popover"
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 6px)',
+                          left: 0,
+                          right: 0,
+                          zIndex: 60,
+                          background: '#121620',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          borderRadius: '10px',
+                          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.8)',
+                          padding: '10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}
+                      >
+                        {/* Search input INSIDE dropdown */}
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '10px', 
-                          background: 'rgba(10, 12, 16, 0.85)', 
-                          padding: '10px 14px', 
-                          borderRadius: '8px', 
+                          gap: '8px', 
+                          background: 'rgba(255, 255, 255, 0.06)', 
+                          padding: '8px 12px', 
+                          borderRadius: '6px', 
                           border: '1px solid var(--border)' 
                         }}>
-                          <Search size={16} color="#34d399" />
+                          <Search size={15} color="#34d399" />
                           <input 
                             type="text" 
-                            placeholder="Type product name to search (e.g. Wax, Serum, Shampoo)..." 
-                            value={productSearchTerm}
-                            onChange={(e) => setProductSearchTerm(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const filtered = products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()));
-                                if (filtered.length > 0) {
-                                  const targetP = filtered[0];
-                                  adjustProductQty(targetP.id, 1);
-                                  setProductSearchTerm('');
-                                }
-                              }
+                            placeholder="Search product name (Wax, Serum, Shampoo...)" 
+                            value={productDropdownSearch}
+                            onChange={(e) => setProductDropdownSearch(e.target.value)}
+                            autoFocus
+                            style={{ 
+                              background: 'transparent', 
+                              border: 'none', 
+                              outline: 'none', 
+                              color: '#fff', 
+                              fontSize: '0.88rem', 
+                              width: '100%' 
                             }}
-                            style={{ background: 'transparent', border: 'none', padding: 0, width: '100%', color: '#fff', fontSize: '0.92rem', outline: 'none' }}
                           />
-                          {productSearchTerm && (
+                          {productDropdownSearch && (
                             <button 
-                              type="button"
-                              onClick={() => setProductSearchTerm('')} 
-                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                              type="button" 
+                              onClick={() => setProductDropdownSearch('')}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                             >
                               ✕
                             </button>
                           )}
                         </div>
-                      </div>
 
-                      <button 
-                        type="button" 
-                        className="btn btn-sm btn-outline-gold"
-                        onClick={() => setNewPrdModal(true)}
-                        style={{ whiteSpace: 'nowrap', padding: '10px 14px', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
-                      >
-                        <Plus size={14} /> New Product
-                      </button>
-                    </div>
-
-                    {/* Instant Search Results Panel */}
-                    {productSearchTerm.trim() && (
-                      <div style={{ 
-                        position: 'absolute', 
-                        top: '100%', 
-                        left: 0, 
-                        right: 0, 
-                        zIndex: 50, 
-                        marginTop: '4px',
-                        background: '#131822', 
-                        border: '1px solid rgba(16, 185, 129, 0.4)', 
-                        borderRadius: '10px', 
-                        maxHeight: '220px', 
-                        overflowY: 'auto', 
-                        padding: '6px', 
-                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7)',
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '4px' 
-                      }}>
-                        {products
-                          .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
-                          .map(p => {
-                            const qty = selectedProducts[p.id] || 0;
-                            return (
-                              <div 
-                                key={p.id} 
-                                onClick={() => {
-                                  adjustProductQty(p.id, 1);
-                                  setProductSearchTerm('');
-                                }}
-                                style={{ 
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center', 
-                                  padding: '9px 12px', 
-                                  borderRadius: '6px', 
-                                  background: qty > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)', 
-                                  cursor: 'pointer',
-                                  fontSize: '0.9rem',
-                                  transition: 'background 0.15s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.18)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = qty > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)';
-                                }}
-                              >
-                                <span style={{ fontWeight: 600 }}>{p.name}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: '#34d399', fontWeight: 700 }}>₹{p.price}</span>
-                                  {qty > 0 ? (
-                                    <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>Added ({qty}) ✓</span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#000', background: '#34d399', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>+ Add</span>
-                                  )}
+                        {/* Filtered Products List */}
+                        <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {products
+                            .filter(p => p.name.toLowerCase().includes(productDropdownSearch.toLowerCase()))
+                            .map(p => {
+                              const qty = selectedProducts[p.id] || 0;
+                              return (
+                                <div 
+                                  key={p.id}
+                                  onClick={() => {
+                                    adjustProductQty(p.id, 1);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    background: qty > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                    cursor: 'pointer',
+                                    border: qty > 0 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                                    transition: 'background 0.15s'
+                                  }}
+                                >
+                                  <div>
+                                    <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{p.name}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#34d399', fontWeight: 700 }}>₹{p.price}</span>
+                                    {qty > 0 ? (
+                                      <span style={{ fontSize: '0.75rem', background: '#34d399', color: '#000', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                        Qty: {qty}
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: '0.75rem', background: '#34d399', color: '#000', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                        + Add
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        {products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase())).length === 0 && (
-                          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.84rem' }}>
-                            No product matching "{productSearchTerm}". Click "+ New Product" to create it.
-                          </div>
-                        )}
+                              );
+                            })}
+                          {products.filter(p => p.name.toLowerCase().includes(productDropdownSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                              No products found matching "{productDropdownSearch}".
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Done Button to close dropdown */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-outline-gold"
+                            onClick={() => setIsProductDropdownOpen(false)}
+                            style={{ padding: '4px 12px', fontSize: '0.8rem', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+                          >
+                            Done Selecting
+                          </button>
+                        </div>
                       </div>
                     )}
-                  </div>
-
-                  {/* Dropdown Quick Picker for Users Who Prefer Dropdown */}
-                  <div className="input-field" style={{ margin: 0 }}>
-                    <select 
-                      value=""
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
-                        adjustProductQty(val, 1);
-                      }}
-                    >
-                      <option value="">-- Or Select from All Products Dropdown --</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} — ₹{p.price} {selectedProducts[p.id] ? `(Qty: ${selectedProducts[p.id]})` : ''}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   {/* Selected Products Tags / Pills with Qty controls */}
@@ -1528,7 +1586,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     </label>
                     {Object.entries(selectedProducts).length === 0 ? (
                       <div style={{ padding: '12px', background: 'rgba(10, 12, 16, 0.4)', borderRadius: '8px', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                        No retail products added. Choose a product from the search or dropdown above if customer purchased any.
+                        No retail products added. Click the dropdown menu above to select products if customer purchased any.
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -1646,6 +1704,46 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     <span>Grand Total:</span>
                     <span>₹{grandTotal}</span>
                   </div>
+
+                  {/* Paid & Pending Account Rows */}
+                  <div className="sum-row" style={{ paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <span style={{ fontWeight: 600, color: '#34d399' }}>Paid Account Amount:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: '#34d399', fontWeight: 700 }}>₹</span>
+                      <input 
+                        type="number" 
+                        min="0"
+                        max={grandTotal}
+                        placeholder={String(grandTotal)}
+                        value={paidAmountInput} 
+                        onChange={(e) => setPaidAmountInput(e.target.value)}
+                        style={{ 
+                          width: '85px', 
+                          padding: '4px 8px', 
+                          textAlign: 'right', 
+                          fontWeight: 700, 
+                          color: '#34d399', 
+                          background: 'rgba(16, 185, 129, 0.12)', 
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          borderRadius: '6px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="sum-row" style={{ color: pendingAmount > 0 ? '#f87171' : 'var(--text-muted)' }}>
+                    <span style={{ fontWeight: 600 }}>Pending Account Amount:</span>
+                    <span style={{ 
+                      fontWeight: 700, 
+                      fontSize: '1rem',
+                      color: pendingAmount > 0 ? '#ef4444' : '#9ca3af',
+                      background: pendingAmount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
+                      padding: pendingAmount > 0 ? '2px 8px' : '0',
+                      borderRadius: '4px'
+                    }}>
+                      ₹{pendingAmount} {pendingAmount > 0 ? '(Due)' : '(Settled)'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Payment Option (Cash & UPI) */}
@@ -1678,7 +1776,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
           </div>
         )}
 
-        {/* TAB 2: REPORTS (Renamed from Filter & Analytics) */}
+        {/* TAB 2: REPORTS (Comprehensive Financial & Staff Work Reports) */}
         {activeTab === 'reports' && (
           <div>
             {/* Filter Bar */}
@@ -1689,6 +1787,28 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 <button className={`pill-btn ${filterRange === 'week' ? 'active' : ''}`} onClick={() => setFilterRange('week')}>This Week</button>
                 <button className={`pill-btn ${filterRange === 'month' ? 'active' : ''}`} onClick={() => setFilterRange('month')}>This Month</button>
                 <button className={`pill-btn ${filterRange === 'all' ? 'active' : ''}`} onClick={() => setFilterRange('all')}>All Time</button>
+              </div>
+
+              {/* Staff Member Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Staff:</span>
+                <select 
+                  value={staffFilter} 
+                  onChange={(e) => setStaffFilter(e.target.value)}
+                  style={{ 
+                    padding: '6px 12px', 
+                    fontSize: '0.82rem', 
+                    borderRadius: '8px',
+                    background: 'rgba(10, 12, 16, 0.8)',
+                    color: '#fff',
+                    border: '1px solid var(--border)'
+                  }}
+                >
+                  <option value="all">All Staff Members ({employees.length})</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>{emp.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Custom Date Range (Max Date = Today) */}
@@ -1737,14 +1857,32 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="kpi-row">
+            {/* KPI Cards (Including Paid & Pending Balances) */}
+            <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <div className="kpi-box">
                 <div className="kpi-ico gold">₹</div>
                 <div className="kpi-text">
-                  <span>Total Revenue</span>
+                  <span>Total Billed</span>
                   <h3>₹{metricRevenue.toLocaleString('en-IN')}</h3>
-                  <small>Filtered Range</small>
+                  <small>Billed Revenue</small>
+                </div>
+              </div>
+
+              <div className="kpi-box">
+                <div className="kpi-ico emerald">✓</div>
+                <div className="kpi-text">
+                  <span>Paid Received</span>
+                  <h3 style={{ color: '#34d399' }}>₹{metricPaidRevenue.toLocaleString('en-IN')}</h3>
+                  <small>Collected Cash/UPI</small>
+                </div>
+              </div>
+
+              <div className="kpi-box">
+                <div className="kpi-ico" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>⚠️</div>
+                <div className="kpi-text">
+                  <span>Pending Due</span>
+                  <h3 style={{ color: metricPendingTotal > 0 ? '#ef4444' : '#9ca3af' }}>₹{metricPendingTotal.toLocaleString('en-IN')}</h3>
+                  <small>Unpaid Account Balance</small>
                 </div>
               </div>
 
@@ -1753,16 +1891,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                 <div className="kpi-text">
                   <span>Customers Served</span>
                   <h3>{filteredVisits.length}</h3>
-                  <small>Total Visits</small>
-                </div>
-              </div>
-
-              <div className="kpi-box">
-                <div className="kpi-ico purple"><Percent size={22} /></div>
-                <div className="kpi-text">
-                  <span>Discounts Given</span>
-                  <h3>₹{metricDiscountTotal.toLocaleString('en-IN')}</h3>
-                  <small>Total savings provided</small>
+                  <small>{staffFilter !== 'all' ? `By ${staffFilter}` : 'Total Visits'}</small>
                 </div>
               </div>
 
@@ -1776,8 +1905,97 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               </div>
             </div>
 
-            {/* Customer Records Table */}
-            <div className="glass-panel">
+            {/* STAFF WORK & PERFORMANCE REPORT SECTION */}
+            <div className="glass-panel" style={{ marginTop: '20px' }}>
+              <div className="panel-header">
+                <div className="panel-title">
+                  <UserCheck size={20} /> Staff Work & Performance Report
+                </div>
+                <span className="badge-pill">
+                  {staffWorkReport.filter(s => s.totalCustomers > 0).length} Active Staff in Range
+                </span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                Comprehensive breakdown of how each staff/stylist worked, customers handled, and revenue generated in the selected period.
+              </p>
+
+              <div className="table-wrap">
+                <table className="styled-table">
+                  <thead>
+                    <tr>
+                      <th>Staff / Stylist</th>
+                      <th>Designation</th>
+                      <th style={{ textAlign: 'center' }}>Customers Served</th>
+                      <th style={{ textAlign: 'center' }}>Services Done</th>
+                      <th style={{ textAlign: 'center' }}>Retail Products Sold</th>
+                      <th style={{ textAlign: 'right' }}>Total Revenue</th>
+                      <th style={{ textAlign: 'right' }}>Amount Paid</th>
+                      <th style={{ textAlign: 'right' }}>Pending Due</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffWorkReport.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-dim)' }}>
+                          No staff members registered.
+                        </td>
+                      </tr>
+                    ) : (
+                      staffWorkReport.map(st => (
+                        <tr 
+                          key={st.id}
+                          style={{
+                            background: staffFilter === st.name ? 'rgba(212, 175, 55, 0.1)' : 'transparent',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setStaffFilter(prev => prev === st.name ? 'all' : st.name)}
+                          title="Click to filter visits by this staff member"
+                        >
+                          <td>
+                            <strong>{st.name}</strong>
+                            {staffFilter === st.name && (
+                              <span style={{ marginLeft: '8px', fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 700 }}>
+                                (Filter Active)
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="badge-tag-staff">{st.role}</span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <strong style={{ fontSize: '0.95rem' }}>{st.totalCustomers}</strong> visits
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge-pill" style={{ fontSize: '0.75rem' }}>{st.totalServicesCount} services</span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge-pill" style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399', fontSize: '0.75rem' }}>
+                              {st.totalProductsCount} items
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>₹{st.totalRevenue.toLocaleString('en-IN')}</strong>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <span style={{ color: '#34d399', fontWeight: 600 }}>₹{st.totalPaid.toLocaleString('en-IN')}</span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {st.totalPending > 0 ? (
+                              <span style={{ color: '#ef4444', fontWeight: 700 }}>₹{st.totalPending.toLocaleString('en-IN')}</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-dim)' }}>₹0</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Customer Records Table with Paid & Pending Columns */}
+            <div className="glass-panel" style={{ marginTop: '20px' }}>
               <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(10,12,16,0.6)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', minWidth: '240px' }}>
                   <Search size={16} color="var(--text-dim)" />
@@ -1790,7 +2008,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   />
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Showing {filteredVisits.length} Records
+                  Showing {filteredVisits.length} Records {staffFilter !== 'all' ? `(Staff: ${staffFilter})` : ''}
                 </div>
               </div>
 
@@ -1801,10 +2019,10 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       <th>Date & Time</th>
                       <th>Customer Details</th>
                       <th>Stylist / Staff</th>
-                      <th>Services</th>
-                      <th>Products</th>
-                      <th>Discount</th>
-                      <th>Total</th>
+                      <th>Services & Products</th>
+                      <th>Total Bill</th>
+                      <th>Paid Account</th>
+                      <th>Pending Account</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -1816,67 +2034,89 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                         </td>
                       </tr>
                     ) : (
-                      filteredVisits.map(v => (
-                        <tr key={v.id}>
-                          <td>
-                            <strong>{v.date}</strong><br />
-                            <small style={{ color: 'var(--text-dim)' }}>{v.time}</small>
-                          </td>
-                          <td>
-                            <strong>{v.customerName}</strong><br />
-                            <small style={{ color: 'var(--text-dim)' }}>{v.customerPhone}</small>
-                          </td>
-                          <td>
-                            {v.employeeName ? (
-                              <span className="badge-tag-staff">
-                                <User size={12} /> {v.employeeName}
-                              </span>
-                            ) : (
-                              <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>Unassigned</span>
-                            )}
-                          </td>
-                          <td>
-                            {v.services.length > 0 ? v.services.map(s => (
-                              <span key={s.id} className="badge-tag-srv">{s.name}</span>
-                            )) : <span style={{ color: 'var(--text-dim)' }}>None</span>}
-                          </td>
-                          <td>
-                            {v.products.length > 0 ? v.products.map(p => (
-                              <span key={p.id} className="badge-tag-prd">{p.name} ×{p.qty}</span>
-                            )) : <span style={{ color: 'var(--text-dim)' }}>None</span>}
-                          </td>
-                          <td>
-                            {v.discount > 0 ? (
-                              <span style={{ color: '#f87171', fontWeight: 600 }}>-₹{v.discount}</span>
-                            ) : (
-                              <span style={{ color: 'var(--text-dim)' }}>₹0</span>
-                            )}
-                          </td>
-                          <td>
-                            <strong style={{ color: 'var(--gold)' }}>₹{v.grandTotal}</strong>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{v.paymentMethod}</div>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button 
-                                className="btn btn-sm btn-ghost" 
-                                onClick={() => setActiveReceipt(v)}
-                                title="View Receipt"
-                              >
-                                View
-                              </button>
-                              <button 
-                                className="btn btn-sm" 
-                                style={{ background: '#25D366', color: '#fff', padding: '6px 8px' }}
-                                onClick={() => handleSendWhatsApp(v)}
-                                title="Send WhatsApp Receipt"
-                              >
-                                <Send size={13} /> WhatsApp
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      filteredVisits.map(v => {
+                        const paid = v.paidAmount !== undefined ? v.paidAmount : v.grandTotal;
+                        const pending = v.pendingAmount || 0;
+                        return (
+                          <tr key={v.id}>
+                            <td>
+                              <strong>{v.date}</strong><br />
+                              <small style={{ color: 'var(--text-dim)' }}>{v.time}</small>
+                            </td>
+                            <td>
+                              <strong>{v.customerName}</strong><br />
+                              <small style={{ color: 'var(--text-dim)' }}>{v.customerPhone}</small>
+                            </td>
+                            <td>
+                              {v.employeeName ? (
+                                <span className="badge-tag-staff">
+                                  <User size={12} /> {v.employeeName}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>Unassigned</span>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {v.services.length > 0 ? v.services.map(s => (
+                                    <span key={s.id} className="badge-tag-srv">{s.name}</span>
+                                  )) : <span style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>No service</span>}
+                                </div>
+                                {v.products && v.products.length > 0 && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {v.products.map(p => (
+                                      <span key={p.id} className="badge-tag-prd">{p.name} ×{p.qty}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <strong style={{ color: 'var(--gold)' }}>₹{v.grandTotal}</strong>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{v.paymentMethod}</div>
+                            </td>
+                            <td>
+                              <strong style={{ color: '#34d399' }}>₹{paid}</strong>
+                            </td>
+                            <td>
+                              {pending > 0 ? (
+                                <span style={{ 
+                                  color: '#ef4444', 
+                                  fontWeight: 700, 
+                                  background: 'rgba(239, 68, 68, 0.12)', 
+                                  padding: '2px 8px', 
+                                  borderRadius: '4px',
+                                  fontSize: '0.82rem'
+                                }}>
+                                  ₹{pending} Due
+                                </span>
+                              ) : (
+                                <span style={{ color: '#34d399', fontSize: '0.8rem' }}>Settled ✓</span>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button 
+                                  className="btn btn-sm btn-ghost" 
+                                  onClick={() => setActiveReceipt(v)}
+                                  title="View Receipt"
+                                >
+                                  View
+                                </button>
+                                <button 
+                                  className="btn btn-sm" 
+                                  style={{ background: '#25D366', color: '#fff', padding: '6px 8px' }}
+                                  onClick={() => handleSendWhatsApp(v)}
+                                  title="Send WhatsApp Receipt"
+                                >
+                                  <Send size={13} /> WhatsApp
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -2117,10 +2357,20 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     <span>-₹{activeReceipt.discount}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #ccc' }}>
-                  <span>Total Paid:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.95rem', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #ccc' }}>
+                  <span>Grand Total:</span>
                   <span>₹{activeReceipt.grandTotal}</span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700 }}>
+                  <span>Paid Amount:</span>
+                  <span>₹{activeReceipt.paidAmount !== undefined ? activeReceipt.paidAmount : activeReceipt.grandTotal}</span>
+                </div>
+                {activeReceipt.pendingAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626', fontWeight: 700 }}>
+                    <span>Pending Account Amount:</span>
+                    <span>₹{activeReceipt.pendingAmount} (Due)</span>
+                  </div>
+                )}
               </div>
             </div>
 

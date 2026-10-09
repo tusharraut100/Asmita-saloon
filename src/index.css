@@ -1407,3 +1407,50 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Searchable Dropdown Popup Styling */
+.dropdown-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-trigger-box:hover {
+  border-color: var(--gold) !important;
+  background: rgba(18, 22, 30, 0.95) !important;
+}
+
+.dropdown-menu-popover {
+  animation: fadeInDown 0.15s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Badges for Paid & Pending */
+.badge-pending {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badge-settled {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
