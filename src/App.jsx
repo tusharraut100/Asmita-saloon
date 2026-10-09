@@ -1034,15 +1034,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
-            className="btn btn-sm btn-ghost" 
-            onClick={handleLogout}
-            title="Sign Out / Lock App"
-            style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '5px 9px', gap: '4px', height: '36px' }}
-          >
-            <LogOut size={14} />
-            <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>Logout</span>
-          </button>
-          <button 
             className="btn-counter" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation"
