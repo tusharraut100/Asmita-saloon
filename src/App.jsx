@@ -1034,24 +1034,13 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
-            type="button"
-            className="btn btn-sm btn-ghost"
+            className="btn btn-sm btn-ghost" 
             onClick={handleLogout}
-            title="Logout / Lock App"
-            style={{ 
-              color: '#f87171', 
-              border: '1px solid rgba(239, 68, 68, 0.3)', 
-              padding: '6px 10px', 
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.78rem',
-              fontWeight: 600
-            }}
+            title="Sign Out / Lock App"
+            style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '5px 9px', gap: '4px', height: '36px' }}
           >
             <LogOut size={14} />
-            <span>Logout</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>Logout</span>
           </button>
           <button 
             className="btn-counter" 
@@ -1129,14 +1118,25 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </nav>
 
         <div className="sidebar-bottom">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.75rem' }}>
-              A
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.8rem' }}>
+                A
+              </div>
+              <div style={{ lineHeight: 1.2 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin Panel</div>
+                <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
+              </div>
             </div>
-            <div style={{ lineHeight: 1.2 }}>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>Admin Panel</div>
-              <div style={{ fontSize: '0.68rem', color: '#34d399' }}>● Signed In</div>
-            </div>
+            <button 
+              className="btn btn-sm btn-ghost" 
+              onClick={handleLogout}
+              title="Sign Out / Lock App"
+              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '5px 10px', gap: '4px', fontSize: '0.76rem' }}
+            >
+              <LogOut size={13} />
+              <span>Logout</span>
+            </button>
           </div>
         </div>
       </aside>
