@@ -161,7 +161,7 @@ body {
 /* Main Area */
 .main-wrapper {
   flex-grow: 1;
-  padding: 30px 40px;
+  padding: 0 40px 30px;
   overflow-y: auto;
   max-width: 1400px;
 }
@@ -170,7 +170,15 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 28px;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: rgba(11, 13, 17, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 22px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .page-info h1 {
@@ -806,11 +814,15 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 18px;
-  background-color: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: rgba(14, 18, 26, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-gold);
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
-  z-index: 99;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .custom-date-container {
@@ -869,15 +881,18 @@ body {
   }
 
   .main-wrapper {
-    padding: 16px 12px;
+    padding: 12px;
     max-width: 100%;
   }
 
   .header-bar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 20px;
+    position: static;
+    background: transparent;
+    border-bottom: none;
+    padding: 0;
+    margin-bottom: 16px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .form-grid-2 {
