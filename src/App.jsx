@@ -1034,6 +1034,26 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button 
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={handleLogout}
+            title="Logout / Lock App"
+            style={{ 
+              color: '#f87171', 
+              border: '1px solid rgba(239, 68, 68, 0.3)', 
+              padding: '6px 10px', 
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.78rem',
+              fontWeight: 600
+            }}
+          >
+            <LogOut size={14} />
+            <span>Logout</span>
+          </button>
+          <button 
             className="btn-counter" 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation"
@@ -1109,12 +1129,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="daily-summary-widget">
-            <div className="widget-label">Today's Revenue</div>
-            <div className="widget-amount">₹{todayRevenue.toLocaleString('en-IN')}</div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', border: '1px solid var(--border)' }}>
             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--gold), #99751e)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0b0d10', fontWeight: 700, fontSize: '0.75rem' }}>
               A
             </div>
