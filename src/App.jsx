@@ -197,7 +197,7 @@ export default function App() {
   const [assignedEmployee, setAssignedEmployee] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
-  const [discount, setDiscount] = useState(0);
+  const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paidAmountInput, setPaidAmountInput] = useState(''); // Custom paid amount if partial/pending
 
@@ -484,7 +484,7 @@ export default function App() {
     setAssignedEmployee('');
     setSelectedServices([]);
     setSelectedProducts({});
-    setDiscount(0);
+    setDiscount('');
     setPaidAmountInput('');
     setIsServiceDropdownOpen(false);
     setIsProductDropdownOpen(false);
@@ -1708,10 +1708,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   <div className="sum-row" style={{ color: Number(discount) > 0 ? '#f87171' : 'inherit' }}>
                     <span>Discount (₹):</span>
                     <input 
-                      type="number" 
-                      min="0"
+                      type="text" 
+                      inputMode="numeric"
+                      placeholder="0"
                       value={discount} 
-                      onChange={(e) => setDiscount(e.target.value)}
+                      onChange={(e) => {
+                        const cleanDigits = e.target.value.replace(/\D/g, '');
+                        setDiscount(cleanDigits);
+                      }}
                       style={{ width: '80px', padding: '4px 8px', textAlign: 'right' }}
                     />
                   </div>
