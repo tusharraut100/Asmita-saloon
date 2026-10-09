@@ -904,28 +904,30 @@ body {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
-    padding: 8px 12px;
-    background: rgba(18, 22, 31, 0.65);
+    padding: 10px 12px;
+    background: rgba(18, 22, 31, 0.75);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     margin-bottom: 14px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   .page-info {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .page-info h1 {
-    font-size: 1.05rem;
+    font-size: 0.96rem;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: -0.2px;
   }
 
   .page-info p {
@@ -940,15 +942,16 @@ body {
   }
 
   .badge-date {
-    padding: 4px 8px;
+    padding: 5px 8px;
     font-size: 0.72rem;
     border-radius: 6px;
     gap: 4px;
+    white-space: nowrap;
   }
 
   .badge-date svg {
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
   }
 
   .glass-panel {
@@ -1153,11 +1156,11 @@ body {
   }
 
   .page-info h1 {
-    font-size: 0.98rem;
+    font-size: 0.92rem;
   }
 
   .header-bar {
-    padding: 6px 10px;
+    padding: 8px 10px;
     gap: 6px;
     margin-bottom: 12px;
   }
