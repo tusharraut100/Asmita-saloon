@@ -1176,15 +1176,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <button 
-              className="btn btn-sm btn-ghost" 
-              onClick={handleLogout}
-              title="Sign Out / Lock App"
-              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', gap: '6px' }}
-            >
-              <LogOut size={15} />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Logout</span>
-            </button>
           </div>
         </header>
 
