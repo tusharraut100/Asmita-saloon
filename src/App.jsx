@@ -250,12 +250,13 @@ export default function App() {
 
     const fetchCloudData = async () => {
       try {
+        // 1. Fetch Visits
         const { data: cloudVisits, error: vErr } = await supabase
           .from('salon_visits')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!vErr && cloudVisits && cloudVisits.length > 0) {
+        if (!vErr && cloudVisits) {
           const mappedVisits = cloudVisits.map(v => {
             const gTotal = Number(v.grand_total) || 0;
             const pAmount = v.paid_amount !== undefined && v.paid_amount !== null ? Number(v.paid_amount) : gTotal;
@@ -279,51 +280,51 @@ export default function App() {
             };
           });
 
-          // Merge cloud visits with any locally cached visits so no visits are ever lost
-          setVisits(prev => {
-            const visitMap = new Map();
-            // Start with locally stored visits
-            prev.forEach(item => visitMap.set(item.id, item));
-            // Layer and update with cloud visits
-            mappedVisits.forEach(item => visitMap.set(item.id, item));
-            return Array.from(visitMap.values()).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
-          });
+          // Reflect Supabase visits directly
+          setVisits(mappedVisits);
+          localStorage.setItem('lux_visits', JSON.stringify(mappedVisits));
         }
 
-        const { data: cloudServices } = await supabase.from('salon_services').select('*');
-        if (cloudServices && cloudServices.length > 0) {
-          // Merge to preserve existing services
-          setServices(prev => {
-            const map = new Map(prev.map(s => [s.id, s]));
-            cloudServices.forEach(s => map.set(s.id, { id: s.id, name: s.name, price: Number(s.price) }));
-            return Array.from(map.values());
-          });
+        // 2. Fetch Services
+        const { data: cloudServices, error: sErr } = await supabase.from('salon_services').select('*');
+        if (!sErr && cloudServices) {
+          const mappedServices = cloudServices.map(s => ({
+            id: s.id,
+            name: s.name,
+            price: Number(s.price),
+            category: s.category || 'General'
+          }));
+          setServices(mappedServices);
+          localStorage.setItem('lux_services', JSON.stringify(mappedServices));
         }
 
-        const { data: cloudProducts } = await supabase.from('salon_products').select('*');
-        if (cloudProducts && cloudProducts.length > 0) {
-          setProducts(prev => {
-            const map = new Map(prev.map(p => [p.id, p]));
-            cloudProducts.forEach(p => map.set(p.id, { id: p.id, name: p.name, price: Number(p.price) }));
-            return Array.from(map.values());
-          });
+        // 3. Fetch Products
+        const { data: cloudProducts, error: pErr } = await supabase.from('salon_products').select('*');
+        if (!pErr && cloudProducts) {
+          const mappedProducts = cloudProducts.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            category: p.category || 'Grooming'
+          }));
+          setProducts(mappedProducts);
+          localStorage.setItem('lux_products', JSON.stringify(mappedProducts));
         }
 
-        const { data: cloudEmployees } = await supabase.from('salon_employees').select('*');
-        if (cloudEmployees && cloudEmployees.length > 0) {
-          setEmployees(prev => {
-            const map = new Map(prev.map(e => [e.id, e]));
-            cloudEmployees.forEach(e => map.set(e.id, {
-              id: e.id,
-              name: e.name,
-              phone: e.phone || '',
-              role: e.role || 'Senior Stylist',
-              aadhaarNumber: e.aadhaar_number || '',
-              address: e.address || '',
-              photoUrl: e.photo_url || ''
-            }));
-            return Array.from(map.values());
-          });
+        // 4. Fetch Employees
+        const { data: cloudEmployees, error: eErr } = await supabase.from('salon_employees').select('*');
+        if (!eErr && cloudEmployees) {
+          const mappedEmployees = cloudEmployees.map(e => ({
+            id: e.id,
+            name: e.name,
+            phone: e.phone || '',
+            role: e.role || 'Senior Stylist',
+            aadhaarNumber: e.aadhaar_number || '',
+            address: e.address || '',
+            photoUrl: e.photo_url || ''
+          }));
+          setEmployees(mappedEmployees);
+          localStorage.setItem('lux_employees', JSON.stringify(mappedEmployees));
         }
       } catch (err) {
         console.error('Supabase fetch error:', err);
