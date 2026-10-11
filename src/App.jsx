@@ -154,7 +154,7 @@ export default function App() {
 
     // Master Salon recovery PIN / security verification
     if (resetSecurityCode.trim() !== '7788' && resetSecurityCode.trim().toLowerCase() !== 'asmita') {
-      setForgotError('Invalid Security PIN! Enter the salon master security key (Default: 7788 or ASMITA)');
+      setForgotError('Invalid Security PIN! Please enter the correct master security key.');
       return;
     }
 
@@ -1074,13 +1074,12 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                   <div className="input-field">
                     <label>Master Security PIN / Key *</label>
                     <input 
-                      type="text" 
-                      placeholder="Enter Master PIN (Default: 7788 or ASMITA)"
+                      type="password" 
+                      placeholder="Enter Master Security PIN"
                       value={resetSecurityCode}
                       onChange={(e) => setResetSecurityCode(e.target.value)}
                       required
                     />
-                    <small style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Default salon recovery key is <strong>7788</strong> or <strong>ASMITA</strong></small>
                   </div>
 
                   <div className="input-field">
