@@ -194,7 +194,8 @@ export default function App() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [visitDate, setVisitDate] = useState(todayStr);
-  const [assignedEmployee, setAssignedEmployee] = useState('');
+  const [assignedEmployees, setAssignedEmployees] = useState([]);
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [discount, setDiscount] = useState('');
@@ -352,6 +353,32 @@ export default function App() {
   }, [visits]);
 
   const mainRef = useRef(null);
+  const staffDropdownRef = useRef(null);
+  const serviceDropdownRef = useRef(null);
+  const productDropdownRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(event.target)) {
+        setIsStaffDropdownOpen(false);
+      }
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target)) {
+        setIsServiceDropdownOpen(false);
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target)) {
+        setIsProductDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   // Automatically scroll to the top whenever activeTab changes
   useEffect(() => {
@@ -449,13 +476,15 @@ export default function App() {
       return { id: pid, name: p?.name, price: p?.price, qty, lineTotal: (p?.price || 0) * qty };
     });
 
+    const employeeNamesStr = assignedEmployees.join(', ');
+
     const newVisit = {
       id: 'INV-' + Date.now().toString().slice(-6),
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim() || 'Walk-in',
       date: visitDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      employeeName: assignedEmployee.trim(),
+      employeeName: employeeNamesStr,
       services: [...selectedServices],
       products: recordedProducts,
       servicesTotal,
@@ -525,7 +554,8 @@ export default function App() {
     // Reset Form
     setCustomerName('');
     setCustomerPhone('');
-    setAssignedEmployee('');
+    setAssignedEmployees([]);
+    setIsStaffDropdownOpen(false);
     setSelectedServices([]);
     setSelectedProducts({});
     setDiscount('');
@@ -774,9 +804,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
       if (isSupabaseConfigured && supabase) {
         supabase.from('salon_employees').delete().eq('id', empId).then();
       }
-      if (assignedEmployee === empName) {
-        setAssignedEmployee('');
-      }
+      setAssignedEmployees(prev => prev.filter(name => name !== empName));
       alert(`🗑️ Staff member "${empName}" deleted.`);
     }
   };
@@ -807,6 +835,44 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
     // Immediately open receipt showing all amount is paid
     setActiveReceipt(updatedVisit);
+  };
+
+  // Delete Customer Visit Entry (from local state and Supabase database)
+  const handleDeleteVisit = async (visit) => {
+    const confirmDelete = window.confirm(
+      `⚠️ Are you sure you want to delete this visit entry?\n\nCustomer: ${visit.customerName}\nInvoice: ${visit.id}\nDate: ${visit.date}\nAmount: ₹${visit.grandTotal}\n\nThis will permanently delete it from records and database.`
+    );
+    if (!confirmDelete) return;
+
+    // 1. Remove from local state
+    const remainingVisits = visits.filter(v => v.id !== visit.id);
+    setVisits(remainingVisits);
+    localStorage.setItem('lux_visits', JSON.stringify(remainingVisits));
+
+    // 2. If active receipt is the one being deleted, close modal
+    if (activeReceipt && activeReceipt.id === visit.id) {
+      setActiveReceipt(null);
+    }
+
+    // 3. Delete from Supabase cloud database
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase
+          .from('salon_visits')
+          .delete()
+          .eq('id', visit.id);
+
+        if (error) {
+          console.error('Error deleting visit from Supabase:', error);
+          alert(`⚠️ Deleted locally, but cloud delete error: ${error.message}`);
+          return;
+        }
+      } catch (err) {
+        console.error('Supabase delete exception:', err);
+      }
+    }
+
+    alert(`🗑️ Visit entry #${visit.id} for "${visit.customerName}" deleted successfully.`);
   };
 
   // Robust Date Normalizer to 'YYYY-MM-DD'
@@ -861,7 +927,17 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
     // Staff Filter
     if (staffFilter && staffFilter !== 'all') {
-      if ((v.employeeName || '').trim() !== staffFilter.trim()) return false;
+      const vEmp = (v.employeeName || '').trim().toLowerCase();
+      const filterKey = staffFilter.trim().toLowerCase();
+      if (filterKey === '__unassigned__' || filterKey === 'unassigned') {
+        if (vEmp) return false;
+      } else {
+        const assignedList = (v.employeeName || '').split(',').map(s => s.trim().toLowerCase());
+        // Match either exact combined name or contains staff
+        const isExactMatch = vEmp === filterKey;
+        const isIncluded = assignedList.includes(filterKey);
+        if (!isExactMatch && !isIncluded) return false;
+      }
     }
 
     if (searchQuery.trim()) {
@@ -887,33 +963,88 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
   const metricProductsCount = filteredVisits.reduce((acc, v) => acc + (v.products?.reduce((s, p) => s + (Number(p.qty) || 1), 0) || 0), 0);
 
   // Staff Work Report Aggregation
-  // Calculate performance metrics for all staff members based on the active date filter
-  const staffWorkReport = employees.map(emp => {
-    // We match by employee name (case-insensitive & trimmed)
-    const empVisits = filteredVisits.filter(v => 
-      (v.employeeName || '').trim().toLowerCase() === emp.name.trim().toLowerCase()
-    );
-    const totalCustomers = empVisits.length;
-    const totalRevenue = empVisits.reduce((sum, v) => sum + (Number(v.grandTotal) || 0), 0);
-    const totalPaid = empVisits.reduce((sum, v) => sum + (v.paidAmount !== undefined ? Number(v.paidAmount) || 0 : Number(v.grandTotal) || 0), 0);
-    const totalPending = empVisits.reduce((sum, v) => sum + (Number(v.pendingAmount) || 0), 0);
-    const totalServicesCount = empVisits.reduce((sum, v) => sum + (v.services?.length || 0), 0);
-    const totalProductsCount = empVisits.reduce((sum, v) => sum + (v.products?.reduce((s, p) => s + (Number(p.qty) || 1), 0) || 0), 0);
+  // Calculate performance metrics based on the active date filter
+  // If a visit has multiple staff (e.g. "Suresh Kumar, Pooja Verma"), it gets its own separate combined row
+  const staffWorkReport = React.useMemo(() => {
+    // 1. Gather all unique assigned staff combinations present in filteredVisits
+    const groupsMap = new Map();
 
-    return {
-      id: emp.id,
-      name: emp.name,
-      role: emp.role || 'Staff',
-      phone: emp.phone,
-      totalCustomers,
-      totalRevenue,
-      totalPaid,
-      totalPending,
-      totalServicesCount,
-      totalProductsCount,
-      avgTicket: totalCustomers > 0 ? Math.round(totalRevenue / totalCustomers) : 0
-    };
-  }).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    // Ensure all registered individual employees exist in the list
+    employees.forEach(emp => {
+      groupsMap.set(emp.name.trim().toLowerCase(), {
+        id: emp.id,
+        name: emp.name,
+        role: emp.role || 'Staff',
+        isTeam: false,
+        visits: []
+      });
+    });
+
+    // Also include Unassigned if any visits are unassigned
+    let unassignedVisits = [];
+
+    // Distribute visits to exact matching group/individual
+    filteredVisits.forEach(v => {
+      const empNameStr = (v.employeeName || '').trim();
+      if (!empNameStr) {
+        unassignedVisits.push(v);
+        return;
+      }
+
+      // Check if it's a multi-staff team
+      const parts = empNameStr.split(',').map(s => s.trim()).filter(Boolean);
+      const isMulti = parts.length > 1;
+      const key = empNameStr.toLowerCase();
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          id: `team-${key}`,
+          name: empNameStr,
+          role: isMulti ? `Joint Work (${parts.length} Staff)` : 'Staff',
+          isTeam: isMulti,
+          visits: []
+        });
+      }
+
+      groupsMap.get(key).visits.push(v);
+    });
+
+    if (unassignedVisits.length > 0) {
+      groupsMap.set('__unassigned__', {
+        id: 'unassigned',
+        name: 'Unassigned',
+        role: 'No staff assigned',
+        isTeam: false,
+        visits: unassignedVisits
+      });
+    }
+
+    const report = Array.from(groupsMap.values()).map(g => {
+      const totalCustomers = g.visits.length;
+      const totalRevenue = g.visits.reduce((sum, v) => sum + (Number(v.grandTotal) || 0), 0);
+      const totalPaid = g.visits.reduce((sum, v) => sum + (v.paidAmount !== undefined ? Number(v.paidAmount) || 0 : Number(v.grandTotal) || 0), 0);
+      const totalPending = g.visits.reduce((sum, v) => sum + (Number(v.pendingAmount) || 0), 0);
+      const totalServicesCount = g.visits.reduce((sum, v) => sum + (v.services?.length || 0), 0);
+      const totalProductsCount = g.visits.reduce((sum, v) => sum + (v.products?.reduce((s, p) => s + (Number(p.qty) || 1), 0) || 0), 0);
+
+      return {
+        id: g.id,
+        name: g.name,
+        role: g.role,
+        isTeam: g.isTeam,
+        totalCustomers,
+        totalRevenue,
+        totalPaid,
+        totalPending,
+        totalServicesCount,
+        totalProductsCount,
+        avgTicket: totalCustomers > 0 ? Math.round(totalRevenue / totalCustomers) : 0
+      };
+    });
+
+    // Show active groups first, sorted by revenue descending
+    return report.sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }, [employees, filteredVisits]);
 
   // CSV Export
   const handleExportCSV = () => {
@@ -1271,7 +1402,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
           <div className="billing-layout">
             <div className="billing-form">
               {/* Customer Info Card */}
-              <div className="glass-panel">
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  position: 'relative', 
+                  zIndex: isStaffDropdownOpen ? 105 : 6, 
+                  overflow: 'visible' 
+                }}
+              >
                 <div className="panel-title">
                   <User size={18} /> 1. Customer Details
                 </div>
@@ -1316,19 +1454,126 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       onChange={handleDateChange}
                     />
                   </div>
-                  <div className="input-field">
-                    <label>Assigned Stylist / Staff</label>
-                    <select 
-                      value={assignedEmployee}
-                      onChange={(e) => setAssignedEmployee(e.target.value)}
+                  <div ref={staffDropdownRef} className="input-field" style={{ position: 'relative', zIndex: isStaffDropdownOpen ? 106 : 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ margin: 0 }}>Assigned Stylist / Staff</label>
+                      {assignedEmployees.length > 0 && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 600 }}>
+                          {assignedEmployees.length} selected
+                        </span>
+                      )}
+                    </div>
+                    <div 
+                      onClick={() => {
+                        setIsStaffDropdownOpen(prev => !prev);
+                        setIsServiceDropdownOpen(false);
+                        setIsProductDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        background: 'rgba(10, 12, 16, 0.85)',
+                        border: isStaffDropdownOpen ? '1px solid var(--gold)' : '1px solid var(--border)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        minHeight: '42px',
+                        transition: 'border-color 0.2s',
+                        userSelect: 'none'
+                      }}
                     >
-                      <option value="">-- Choose Working Staff --</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.name}>
-                          {emp.name}
-                        </option>
-                      ))}
-                    </select>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                        {assignedEmployees.length === 0 ? (
+                          <span style={{ color: 'var(--text-dim)', fontSize: '0.88rem' }}>-- Choose Staff (Multi-select) --</span>
+                        ) : (
+                          assignedEmployees.map(name => (
+                            <span 
+                              key={name}
+                              className="badge-tag-staff"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAssignedEmployees(prev => prev.filter(n => n !== name));
+                              }}
+                            >
+                              <User size={11} /> {name} <span style={{ marginLeft: '4px', opacity: 0.7 }}>✕</span>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gold)', transform: isStaffDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s', marginLeft: '8px' }}>
+                        ▼
+                      </span>
+                    </div>
+
+                    {isStaffDropdownOpen && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 6px)',
+                          left: 0,
+                          right: 0,
+                          zIndex: 999,
+                          background: '#121620',
+                          border: '1px solid var(--border-gold)',
+                          borderRadius: '8px',
+                          boxShadow: '0 12px 28px rgba(0,0,0,0.7)',
+                          padding: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          maxHeight: '220px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {employees.map(emp => {
+                          const isSelected = assignedEmployees.includes(emp.name);
+                          return (
+                            <div
+                              key={emp.id}
+                              onClick={() => {
+                                setAssignedEmployees(prev => 
+                                  isSelected ? prev.filter(n => n !== emp.name) : [...prev, emp.name]
+                                );
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 10px',
+                                borderRadius: '6px',
+                                background: isSelected ? 'rgba(212, 175, 55, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                border: isSelected ? '1px solid rgba(212, 175, 55, 0.4)' : '1px solid transparent',
+                                cursor: 'pointer',
+                                transition: '0.15s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '4px',
+                                  border: isSelected ? '1px solid var(--gold)' : '1px solid var(--border)',
+                                  background: isSelected ? 'var(--gold)' : 'transparent',
+                                  color: '#000',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold'
+                                }}>
+                                  {isSelected && '✓'}
+                                </div>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 500, color: '#fff' }}>{emp.name}</span>
+                              </div>
+                              <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>{emp.role || 'Stylist'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1352,12 +1597,13 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {/* Searchable Dropdown Component for Services */}
-                  <div className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
+                  <div ref={serviceDropdownRef} className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
                     <div 
                       className="dropdown-trigger-box"
                       onClick={() => {
                         setIsServiceDropdownOpen(prev => !prev);
                         setIsProductDropdownOpen(false);
+                        setIsStaffDropdownOpen(false);
                       }}
                       style={{
                         display: 'flex',
@@ -1538,12 +1784,13 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {/* Searchable Dropdown Component for Retail Products */}
-                  <div className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
+                  <div ref={productDropdownRef} className="dropdown-search-wrapper" style={{ position: 'relative', zIndex: 100 }}>
                     <div 
                       className="dropdown-trigger-box"
                       onClick={() => {
                         setIsProductDropdownOpen(prev => !prev);
                         setIsServiceDropdownOpen(false);
+                        setIsStaffDropdownOpen(false);
                       }}
                       style={{
                         display: 'flex',
@@ -2049,12 +2296,30 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                           title="Click to filter visits by this staff member"
                         >
                           <td>
-                            <strong>{st.name}</strong>
-                            {staffFilter === st.name && (
-                              <span style={{ marginLeft: '8px', fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 700 }}>
-                                (Filter Active)
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <strong>{st.name}</strong>
+                              {st.isTeam && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(59, 130, 246, 0.15)',
+                                  color: '#60a5fa',
+                                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                                  fontWeight: 600
+                                }}>
+                                  Combined Team
+                                </span>
+                              )}
+                              {staffFilter === st.name && (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 700 }}>
+                                  (Filter Active)
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                              {st.role}
+                            </div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <strong style={{ fontSize: '0.95rem' }}>{st.totalCustomers}</strong> visits
@@ -2125,9 +2390,13 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                             </td>
                             <td>
                               {v.employeeName ? (
-                                <span className="badge-tag-staff">
-                                  <User size={12} /> {v.employeeName}
-                                </span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {v.employeeName.split(',').map(name => name.trim()).filter(Boolean).map((name, idx) => (
+                                    <span key={idx} className="badge-tag-staff">
+                                      <User size={12} /> {name}
+                                    </span>
+                                  ))}
+                                </div>
                               ) : (
                                 <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>Unassigned</span>
                               )}
@@ -2192,7 +2461,7 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                               )}
                             </td>
                             <td>
-                              <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <button 
                                   className="btn btn-sm btn-ghost" 
                                   onClick={() => setActiveReceipt(v)}
@@ -2207,6 +2476,14 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                                   title="Send WhatsApp Receipt"
                                 >
                                   <Send size={13} /> WhatsApp
+                                </button>
+                                <button 
+                                  className="btn btn-sm btn-ghost" 
+                                  style={{ color: '#ef4444', padding: '6px 8px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                                  onClick={() => handleDeleteVisit(v)}
+                                  title="Delete this visit entry"
+                                >
+                                  <Trash2 size={13} />
                                 </button>
                               </div>
                             </td>
