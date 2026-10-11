@@ -221,6 +221,7 @@ export default function App() {
   const [editSrvModal, setEditSrvModal] = useState(null); // service object when editing
   const [editPrdModal, setEditPrdModal] = useState(null); // product object when editing
   const [newEmpModal, setNewEmpModal] = useState(false);
+  const [editEmpModal, setEditEmpModal] = useState(null); // employee object when editing
   const [viewEmpModal, setViewEmpModal] = useState(null); // employee details preview
 
   // New catalog item forms
@@ -725,6 +726,46 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
     alert(`✅ Staff member "${newEmpObj.name}" added successfully!`);
   };
 
+  // Update Staff Details
+  const handleUpdateEmployee = () => {
+    if (!editEmpModal.name || !editEmpModal.name.trim()) {
+      alert('Please enter staff name');
+      return;
+    }
+    if (editEmpModal.phone && editEmpModal.phone.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number for staff');
+      return;
+    }
+
+    const updatedEmpObj = {
+      ...editEmpModal,
+      name: editEmpModal.name.trim(),
+      phone: (editEmpModal.phone || '').trim(),
+      aadhaarNumber: (editEmpModal.aadhaarNumber || '').trim(),
+      address: (editEmpModal.address || '').trim(),
+      photoUrl: (editEmpModal.photoUrl || '').trim()
+    };
+
+    setEmployees(prev => prev.map(e => e.id === updatedEmpObj.id ? updatedEmpObj : e));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('salon_employees').upsert([{
+        id: updatedEmpObj.id,
+        name: updatedEmpObj.name,
+        phone: updatedEmpObj.phone,
+        role: updatedEmpObj.role || 'Stylist',
+        aadhaar_number: updatedEmpObj.aadhaarNumber,
+        address: updatedEmpObj.address,
+        photo_url: updatedEmpObj.photoUrl
+      }]).then(({ error }) => {
+        if (error) console.error('Error updating staff in Supabase:', error);
+      });
+    }
+
+    setEditEmpModal(null);
+    alert(`✅ Staff member "${updatedEmpObj.name}" updated successfully!`);
+  };
+
   // Delete Staff
   const handleDeleteEmployee = (empId, empName) => {
     if (confirm(`Are you sure you want to delete staff member "${empName}"?`)) {
@@ -1211,15 +1252,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             </p>
           </div>
           <div className="header-tools">
-            <button 
-              className={`btn btn-sm ${activeTab === 'billing' ? 'btn-ghost' : 'btn-gold'}`} 
-              onClick={() => setActiveTab('billing')}
-              title="Home / New Entry"
-              aria-label="Home"
-              style={{ width: '38px', height: '38px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Home size={18} />
-            </button>
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
@@ -2339,14 +2371,33 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
                       <button 
-                        className="btn btn-sm" 
-                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                        className="btn-counter" 
+                        onClick={() => setViewEmpModal(emp)}
+                        title="View Staff Details"
+                        aria-label="View Staff Details"
+                        style={{ width: '32px', height: '32px' }}
+                      >
+                        <Eye size={15} />
+                      </button>
+                      <button 
+                        className="btn-counter" 
+                        onClick={() => setEditEmpModal({ ...emp })}
+                        title="Edit Staff"
+                        aria-label="Edit Staff"
+                        style={{ width: '32px', height: '32px' }}
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button 
+                        className="btn-counter" 
+                        style={{ width: '32px', height: '32px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
                         onClick={() => handleDeleteEmployee(emp.id, emp.name)}
                         title="Delete Staff"
+                        aria-label="Delete Staff"
                       >
-                        <Trash2 size={14} /> Delete
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
@@ -2684,6 +2735,133 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-ghost" onClick={() => setNewEmpModal(false)}>Cancel</button>
               <button className="btn btn-gold" onClick={handleAddNewEmployee}>Save Staff</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT EMPLOYEE MODAL */}
+      {editEmpModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '500px' }}>
+            <div className="panel-header">
+              <h3>Edit Staff Details</h3>
+              <button className="btn-counter" onClick={() => setEditEmpModal(null)}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '16px 0' }}>
+              <div className="input-field">
+                <label>Staff Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Vikram Sharma" 
+                  value={editEmpModal.name || ''} 
+                  onChange={(e) => setEditEmpModal({ ...editEmpModal, name: e.target.value })} 
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Mobile Number (10 Digits)</label>
+                <input 
+                  type="tel" 
+                  placeholder="9876543210" 
+                  maxLength={10}
+                  value={editEmpModal.phone || ''} 
+                  onChange={(e) => setEditEmpModal({ ...editEmpModal, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} 
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Aadhaar Card Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 1234 5678 9012" 
+                  value={editEmpModal.aadhaarNumber || ''} 
+                  onChange={(e) => setEditEmpModal({ ...editEmpModal, aadhaarNumber: e.target.value })} 
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Full Residential Address</label>
+                <textarea 
+                  rows={2}
+                  placeholder="e.g. House No 12, Gandhi Nagar, Near Main Market"
+                  value={editEmpModal.address || ''}
+                  onChange={(e) => setEditEmpModal({ ...editEmpModal, address: e.target.value })}
+                  style={{
+                    background: 'rgba(10, 12, 16, 0.8)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '0.92rem',
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+
+              <div className="input-field">
+                <label>Staff Photo (Upload Image or Paste URL)</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Image URL (or select file below)" 
+                    value={editEmpModal.photoUrl || ''} 
+                    onChange={(e) => setEditEmpModal({ ...editEmpModal, photoUrl: e.target.value })} 
+                    style={{ flex: 1 }}
+                  />
+                  <label 
+                    className="btn btn-sm btn-ghost" 
+                    style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '10px 14px' }}
+                  >
+                    Upload File
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert('Please select an image smaller than 2MB');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setEditEmpModal(prev => ({ ...prev, photoUrl: event.target.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {editEmpModal.photoUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                    <img 
+                      src={editEmpModal.photoUrl} 
+                      alt="Preview" 
+                      style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-gold)' }} 
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#34d399' }}>✓ Photo attached</span>
+                    <button 
+                      type="button" 
+                      className="btn-counter" 
+                      style={{ width: '22px', height: '22px', fontSize: '0.7rem' }}
+                      onClick={() => setEditEmpModal(prev => ({ ...prev, photoUrl: '' }))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="btn btn-ghost" onClick={() => setEditEmpModal(null)}>Cancel</button>
+              <button className="btn btn-gold" onClick={handleUpdateEmployee}>Save Changes</button>
             </div>
           </div>
         </div>
