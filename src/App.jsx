@@ -190,6 +190,46 @@ export default function App() {
     }
   };
 
+  // Clear All Existing Data (Visits, Staff, Custom Services & Products)
+  const handleClearAllData = async () => {
+    const confirmation = window.prompt(
+      '⚠️ DANGER ZONE: This will permanently delete ALL visits, staff records, custom services, and products from both your local browser and Supabase database.\\n\\nType "CLEAR" to confirm:'
+    );
+
+    if (confirmation !== 'CLEAR') {
+      if (confirmation !== null) alert('Operation cancelled. You must type CLEAR to confirm.');
+      return;
+    }
+
+    try {
+      // 1. Clear Supabase tables if connected
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('salon_visits').delete().neq('id', '___non_existent___');
+        await supabase.from('salon_employees').delete().neq('id', '___non_existent___');
+        await supabase.from('salon_services').delete().neq('id', '___non_existent___');
+        await supabase.from('salon_products').delete().neq('id', '___non_existent___');
+      }
+
+      // 2. Clear LocalStorage
+      localStorage.removeItem('lux_visits');
+      localStorage.removeItem('lux_employees');
+      localStorage.removeItem('lux_services');
+      localStorage.removeItem('lux_products');
+
+      // 3. Reset React States to defaults
+      setVisits([]);
+      setEmployees([]);
+      setServices(INITIAL_SERVICES);
+      setProducts(INITIAL_PRODUCTS);
+
+      alert('✅ All existing data (Visits, Staff, Custom Services & Products) has been cleared successfully!');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error clearing data:', err);
+      alert('Error clearing data: ' + err.message);
+    }
+  };
+
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -1219,12 +1259,21 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
           </button>
         </nav>
 
-        <div className="sidebar-bottom">
+        <div className="sidebar-bottom" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button 
+            className="btn btn-sm btn-ghost" 
+            onClick={handleClearAllData}
+            title="Clear all existing data from browser & database"
+            style={{ width: '100%', justifyContent: 'center', color: '#f87171', border: '1px dashed rgba(239, 68, 68, 0.4)', padding: '8px 12px', gap: '6px', fontSize: '0.78rem', borderRadius: '8px' }}
+          >
+            <Trash2 size={14} />
+            <span>Clear All Data</span>
+          </button>
           <button 
             className="btn btn-sm btn-ghost" 
             onClick={handleLogout}
             title="Sign Out / Lock App"
-            style={{ width: '100%', justifyContent: 'center', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '9px 12px', gap: '6px', fontSize: '0.82rem', borderRadius: '8px' }}
+            style={{ width: '100%', justifyContent: 'center', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '8px 12px', gap: '6px', fontSize: '0.82rem', borderRadius: '8px' }}
           >
             <LogOut size={15} />
             <span>Logout</span>
