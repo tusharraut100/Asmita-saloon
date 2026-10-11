@@ -137,10 +137,13 @@ export default function App() {
   // Handle Login
   const handleLogin = (e) => {
     e.preventDefault();
-    if (loginUsername === 'admin' && loginPassword === adminPassword) {
+    const currentValidPwd = localStorage.getItem('lux_admin_pwd') || adminPassword || 'admin123';
+    if (loginUsername.trim().toLowerCase() === 'admin' && loginPassword === currentValidPwd) {
       setIsAuthenticated(true);
       localStorage.setItem('lux_auth', 'true');
       setAuthError('');
+      // Clear credentials from state after successful login
+      setLoginPassword('');
     } else {
       setAuthError('Invalid credentials! Check your username and password.');
     }
@@ -168,10 +171,12 @@ export default function App() {
       return;
     }
 
-    setAdminPassword(newPasswordVal);
-    localStorage.setItem('lux_admin_pwd', newPasswordVal);
+    // Save newly updated password permanently to state and localStorage
+    const savedPwd = newPasswordVal.trim();
+    setAdminPassword(savedPwd);
+    localStorage.setItem('lux_admin_pwd', savedPwd);
     setForgotSuccess('✅ Password successfully updated! You can now log in.');
-    setLoginPassword(newPasswordVal);
+    setLoginPassword(savedPwd);
 
     setTimeout(() => {
       setForgotModal(false);
@@ -187,6 +192,11 @@ export default function App() {
     if (confirm('Are you sure you want to log out?')) {
       setIsAuthenticated(false);
       localStorage.removeItem('lux_auth');
+      // Clear form credentials on logout so form is clean
+      setLoginUsername('');
+      setLoginPassword('');
+      setShowPassword(false);
+      setAuthError('');
     }
   };
 
