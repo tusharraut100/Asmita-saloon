@@ -1252,6 +1252,17 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
             </p>
           </div>
           <div className="header-tools">
+            {activeTab !== 'billing' && (
+              <button 
+                className="btn btn-sm btn-gold" 
+                onClick={() => setActiveTab('billing')}
+                title="Back to Home / New Entry"
+                aria-label="Home"
+                style={{ width: '38px', height: '38px', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Home size={18} />
+              </button>
+            )}
             <div className="badge-date">
               <Clock size={16} />
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
