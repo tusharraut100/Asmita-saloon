@@ -2385,15 +2385,6 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
                     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
                       <button 
                         className="btn-counter" 
-                        onClick={() => setViewEmpModal(emp)}
-                        title="View Staff Details"
-                        aria-label="View Staff Details"
-                        style={{ width: '32px', height: '32px' }}
-                      >
-                        <Eye size={15} />
-                      </button>
-                      <button 
-                        className="btn-counter" 
                         onClick={() => setEditEmpModal({ ...emp })}
                         title="Edit Staff"
                         aria-label="Edit Staff"
