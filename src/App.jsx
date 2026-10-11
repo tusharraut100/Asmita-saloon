@@ -1037,12 +1037,8 @@ Thank you for visiting *Asmita Family Salon*! Have a wonderful day ahead! ✂️
               className="btn btn-gold" 
               style={{ marginTop: '8px', padding: '12px', fontSize: '0.96rem', width: '100%' }}
             >
-              <ShieldCheck size={18} /> Sign In & Access Dashboard
+              <ShieldCheck size={18} /> Sign In
             </button>
-
-            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px' }}>
-              🔒 Protected Staff & Admin Portal • Default: <code>admin</code> / <code>admin123</code>
-            </div>
           </form>
 
           {/* FORGOT / RESET PASSWORD MODAL */}
